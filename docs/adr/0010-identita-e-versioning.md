@@ -1,6 +1,10 @@
 # ADR-0010 — Identità basate su hash e versioning dei contratti
 
-Stato: Proposta · Data: 2026-10-20
+Stato: **Sostituita da [ADR-0013](0013-identita-e-hashing.md)** · Data: 2026-10-20 · Sostituita: 2026-10-23
+
+> Motivo: l'arrotondamento dei float alla precisione dello strumento poteva rendere
+> indistinguibili dati materialmente diversi e non separava le identità di
+> richiesta, evento, candidato e contenuto.
 
 ## Contesto
 Nel vecchio FxAgent le versioni di outcome e funnel sono state cambiate dopo

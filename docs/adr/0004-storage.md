@@ -8,9 +8,11 @@ ricerca e governance, con retention e archivi mensili aggiunti dopo.
 
 ## Decisione
 - Dataset di mercato: Parquet immutabili partizionati, con manifest JSON e
-  `dataset_id` = hash del contenuto canonico.
+  `dataset_id` = hash del contenuto canonico (ADR-0013); righe invalide in un
+  file `rejected` separato con il motivo.
 - Audit delle valutazioni e risultati di ricerca: Parquet append-only per run,
-  interrogati con DuckDB (embedded, nessun server).
+  interrogati con DuckDB (embedded, nessun server). Protocollo di scrittura,
+  commit e ripresa in [ADR-0014](0014-audit-crash-safe.md).
 - Stato operativo (da M3): SQLite in WAL, poche tabelle esplicite (intenti,
   posizioni osservate, binding account, kill switch, heartbeat). Transazioni
   brevi; il broker resta la verità sulle posizioni.

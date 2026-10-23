@@ -1,9 +1,19 @@
 # FxAgent Next — M0: specifica e design
 
-Stato: **proposta, in attesa di approvazione** · Data: 2026-10-20 · Milestone: M0
+Stato: **proposta, in attesa di approvazione** · Revisione: v0.1 (2026-10-23) · Milestone: M0
+Contratti: `contracts-v0.1`
 
 Questo documento è la specifica M0. Non contiene codice applicativo. Contratti
 dettagliati in [contracts.md](contracts.md), decisioni in [adr/](adr/README.md).
+
+**Revisione v0.1 (2026-10-23).** Architettura invariata. Precisati: disponibilità
+per ogni osservazione anche nelle serie colonnari e nelle barre derivate (§4.1);
+scheduling con chiusura attesa, disponibilità, `as_of` nominale e ritardo
+massimo (§4.2); stati di barra distinti e base di prezzo dei livelli (§4.5);
+immutabilità profonda (§4.7); identità separate e hashing senza arrotondamenti
+(§4.8); protocollo audit/checkpoint crash-safe (contracts §10); baseline
+formalizzata con ATR a media semplice (§6). Nuovi ADR 0012–0014; ADR-0010
+sostituito da 0013. Test di accettazione per ciascun punto in §12.
 
 ---
 
@@ -19,7 +29,7 @@ Tre idee portanti:
 1. **Valutazione guidata dall'orologio, non dai dati.** Il replay pianifica una
    valutazione per ogni chiusura attesa di barra secondo il calendario FX. Se la
    barra manca, la valutazione esiste comunque e termina in astensione
-   `DATA_GAP`. Così un buco nei dati non può mai sparire silenziosamente.
+   (`BAR_NOT_AVAILABLE` o `DATA_GAP`). Così un buco nei dati non può mai sparire silenziosamente.
 2. **Disponibilità esplicita.** Ogni barra ha `open_time`, `close_time` e
    `available_at`. Uno snapshot al tempo `t` contiene solo barre con
    `available_at <= t`. Le barre incomplete non esistono per il core.
@@ -153,7 +163,7 @@ Interfacce piccole e tipizzate (`typing.Protocol`). Dettaglio in [contracts.md](
 - `BarSource.read(request) -> RawBars` (adapter dati).
 - `DatasetStore.put(bars, manifest) -> DatasetRef` / `get(ref, range) -> BarSeries`.
 - `SnapshotBuilder.build(symbol, as_of, requirements) -> MarketSnapshot`.
-- `AuditSink.write(evaluations)` idempotente per `evaluation_id`.
+- `AuditSink.write(evaluations)` con commit atomico per segmento; una `request_id` già scritta con contenuto diverso è un errore di integrità (contracts §10).
 - M2: `ExecutionModel.simulate(candidate, future_path) -> SimulatedFill/Outcome`.
 - M3: `Broker` (account_identity, symbol_spec, tick, positions, orders/deals history, send, modify, close) con implementazioni `MT5Broker` e `SimulatedBroker`.
 
@@ -178,125 +188,173 @@ il consumatore (Risk/Execution). M2 include un test di parità: stessi snapshot
 
 ## 4. Modello del tempo e dei dati
 
-### 4.1 Tempo
+Le definizioni normative sono in [contracts.md](contracts.md) (`contracts-v0.1`);
+qui la sintesi e le motivazioni.
 
-- Unica rappresentazione interna: `datetime` timezone-aware in UTC (validato da
-  Pydantic, naive rifiutati). Serializzazione: interi in nanosecondi UTC in
-  Parquet, ISO-8601 `Z` in JSON.
+### 4.1 Tempo e disponibilità
+
+- Unica rappresentazione interna: datetime UTC timezone-aware (naive rifiutati);
+  nanosecondi UTC interi in Parquet e negli hash.
 - **Barra**: `open_time` (inclusivo), `close_time = open_time + timeframe`
-  (esclusivo), `available_at >= close_time`. Per dati storici `available_at =
-  close_time + publication_delay` (default 0, configurabile e registrato). In
-  runtime `available_at` è l'istante in cui la barra chiusa è stata osservata.
-- **Snapshot** a `as_of`: contiene solo barre con `available_at <= as_of`.
-  Le barre in formazione non sono mai visibili al core.
-- **Candidato**: `available_at` (quando la decisione è nota) e `expires_at`
-  (oltre il quale non è più eseguibile). Nella baseline `expires_at = as_of + 1
-  barra del timeframe di segnale`.
-- **Ex post**: outcome, fill e costi stanno in tabelle separate (M2/M3) e non
-  sono mai input di `evaluate`.
+  (esclusivo), `available_at >= close_time`, più `availability`:
+  - `MODELLED` per lo storico: `available_at = close_time + publication_delay`
+    (parametro del run, default proposto 0 s, nel fingerprint);
+  - `OBSERVED` quando l'istante di ricezione è stato registrato (runtime, o CSV
+    con colonna `available_at`).
+- **Forma colonnare**: `BarSeries` conserva `available_at` e `availability` per
+  ogni riga, come `Bar` (contracts §4).
+- **Barre derivate H1/H4**: `VALID` solo con tutte le sorgenti M15 `VALID` e
+  disponibili; `available_at = max` delle sorgenti; `OBSERVED` solo se tutte le
+  sorgenti lo sono.
+- **Snapshot** a `as_of`: contiene solo la finestra richiesta dalla strategia e
+  solo barre con `available_at <= as_of`. Il costruttore di `MarketSnapshot`
+  riverifica l'invariante e solleva un'eccezione se violata, così un bug del
+  builder non raggiunge il core.
+- **Ex post** (outcome, fill, costi, causa di un dato mancante) non è mai input
+  di `evaluate`.
 
-### 4.2 Calendario FX
+### 4.2 Scheduling
 
-- Settimana di trading: dalla domenica 17:00 America/New_York al venerdì 17:00
-  America/New_York. Usare il fuso di New York gestisce automaticamente il DST
-  (21:00 UTC in estate USA, 22:00 UTC in inverno). Le settimane in cui USA ed
-  Europa cambiano ora in date diverse sono coperte da test dedicati.
-- Chiusure attese (25 dicembre, 1 gennaio, eventuali altre) in un file di
-  calendario versionato; il calendario ha un `calendar_version` incluso negli hash.
-- Una barra attesa e mancante fuori dalle chiusure è un **gap inatteso**; una
-  barra mancante in una chiusura attesa è **assenza attesa**. Entrambe sono
-  conteggiate; solo la prima causa astensione `DATA_GAP`.
+Per ogni slot k del timeframe di segnale: chiusura attesa `C_k` (calendario),
+disponibilità della barra `A_k`, istante di valutazione `T_k = C_k +
+evaluation_delay` (sempre nominale), istante reale `W_k` (solo runtime).
 
-### 4.3 Timeframe e allineamento
+- Una sola richiesta di valutazione per `(strategia, config, simbolo, C_k)`,
+  nessun retry.
+- **Dato non ancora arrivato** (`A_k > T_k`) e **dato mancante** sono, a `T_k`,
+  la stessa situazione: slot `UNAVAILABLE` → astensione `BAR_NOT_AVAILABLE` (slot
+  di segnale) o `DATA_GAP` (finestra). La distinzione `LATE_ARRIVAL` / `MISSING` /
+  `INVALID_ROW` è un'annotazione ex post di `explain`, fuori dall'hash.
+- **Valutazione troppo tardiva** (solo runtime, `W_k − T_k >
+  max_dispatch_lateness`): la valutazione è calcolata e registrata ma marcata
+  `NOT_DISPATCHED_LATE`; slot persi per downtime `MISSED_DOWNTIME`. In replay
+  `W_k = T_k`.
+- Questo rende identici replay e runtime a parità di osservazioni registrate:
+  il runtime non usa mai l'orologio reale come `as_of`.
 
-- Base: M15 (BID e, se presente, ASK). H1 e H4 derivati da M15 con copertura
-  completa (4 e 16 barre). Barre derivate parziali non vengono create.
-- H4 allineato alla chiusura di New York (confini 17, 21, 01, 05, 09, 13 ora di
-  NY), coerente con i broker MT5 a UTC+2/+3 (ADR-0009). Alternativa in §9.
-- Ogni barra derivata porta `source_dataset_id` e il conteggio delle barre sorgente.
+### 4.3 Calendario FX
 
-### 4.4 Base di prezzo e quote
+- Settimana di trading dalla domenica 17:00 al venerdì 17:00 America/New_York
+  (DST gestito dal fuso di New York). Chiusure attese in file versionato
+  (`calendar_version` negli hash). Fuori sessione non esistono slot.
+- Gli slot sono consecutivi in tempo di sessione: il weekend non è un gap.
 
-- Ogni serie dichiara `price_basis`: `BID`, `ASK` o `MID`. Il core non mescola basi.
-- Se il dataset ha solo BID, lo spread **non** viene inventato come dato: il
-  simulatore (M2) applica un modello di spread esplicito e marca il risultato
-  come `MODELLED`. Una `Quote` ha sempre `provenance ∈ {OBSERVED, MODELLED}`.
-- Barre piatte a volume zero (tipiche dei riempimenti di weekend nei dati
-  Dukascopy) sono marcate `NO_TRADE` ed escluse dagli indicatori, con conteggio.
+### 4.4 Timeframe e allineamento
 
-### 4.5 Dataset
+H1 e H4 derivati da M15 con copertura completa; H4 allineato ai confini
+17/21/01/05/09/13 di New York (ADR-0009).
 
-- Parquet, una partizione per `(symbol, timeframe, price_basis, anno)`.
-- `dataset_id = sha256` del contenuto canonico (colonne ordinate, tipi fissati,
-  righe ordinate per `open_time`). Il manifest JSON contiene sorgente, hash dei
-  file grezzi, intervallo, conteggi, report di qualità, versione dello schema,
-  versione del validatore.
-- Immutabile: una correzione produce un nuovo `dataset_id`. Nessuna modifica in
-  place. Il DB operativo del vecchio FxAgent non viene mai letto.
+### 4.5 Stato delle barre e base di prezzo
 
-### 4.6 Identità
+- Stati distinti e mai equivalenti: `VALID`, `FLAT_ZERO_VOLUME`, `INVALID`,
+  `UNAVAILABLE`, `BEFORE_COVERAGE`; mercato chiuso = nessuno slot; dataset
+  sintetico = provenienza a livello di dataset, mai mescolata con dati reali.
+- Una barra piatta a volume zero in sessione non è né valida né ignorata: resta
+  nel dataset come `FLAT_ZERO_VOLUME`, invalida la barra derivata che la contiene
+  e produce l'astensione `FLAT_BAR_IN_WINDOW`. Fuori sessione è un riempitivo
+  (`CLOSED_FILLER`) contato nel report di qualità.
+- Le righe invalide vanno nel file `rejected` del dataset con il motivo; lo slot
+  corrispondente è `INVALID`.
+- Ogni serie dichiara `price_basis`. Segnale, `entry_ref`, `stop` e `target` della
+  baseline sono su BID (`level_basis = BID`). I prezzi eseguibili e la traduzione
+  in trigger broker appartengono al modello di esecuzione (M2) o al broker (M3),
+  registrati a parte con `Provenance`; i livelli del candidato non si
+  sovrascrivono. Lo spread non viene mai inventato come dato osservato.
 
-| Oggetto | Identificativo |
+### 4.6 Dataset
+
+- Parquet partizionato per `(symbol, timeframe, price_basis, anno)` + file
+  `rejected` + manifest JSON (sorgente, hash dei file grezzi, copertura,
+  conteggi per motivo, provenienza, versioni di schema e validatore).
+- `dataset_id` = content hash delle righe canoniche, indipendente dal writer
+  Parquet. Immutabile: una correzione è un nuovo `dataset_id`.
+- Il DB operativo del vecchio FxAgent non viene mai letto.
+
+### 4.7 Immutabilità
+
+Snapshot, serie, parametri e JSON congelati sono immutabili in profondità
+(ADR-0012): colonne NumPy su buffer `bytes` propri (read-only non riattivabile),
+`FrozenMap` al posto dei dict, `FrozenJson` per i dati liberi, test di non
+mutazione basati su hash prima/dopo `evaluate`.
+
+### 4.8 Identità
+
+Sei identità distinte con schema `fxnext-hash-v1` (ADR-0013, contracts §9):
+
+| Identità | Risponde a |
 |---|---|
-| Configurazione strategia | `config_hash = sha256(JSON canonico dei parametri + strategy_id + strategy_version)` |
-| Snapshot | `snapshot_hash` sulle barre visibili (solo finestra richiesta) + quote + calendar_version |
-| Evento strutturale | `event_id = sha256(strategy_id, strategy_version, symbol, timeframe, open_time barra evento, direzione)` |
-| Valutazione | `evaluation_id = sha256(strategy_id, strategy_version, config_hash, symbol, as_of)` |
-| Run di replay | `run_id` casuale + `run_fingerprint = sha256(dataset_ids, config_hash, engine_version, calendar_version, intervallo)` |
-| Output del run | `output_hash` sull'elenco ordinato delle valutazioni canoniche |
+| `request_id` | quale domanda: strategia, config, simbolo, `C_k`, `as_of` |
+| `event_id` | quale evento strutturale, con discriminante per più eventi sulla stessa barra e direzione |
+| `candidate_id` | quale proposta per quell'evento con quella config |
+| `snapshot_hash`, `evaluation_hash`, `dataset_id` | quale contenuto |
+| `run_fingerprint` | quali input completi del run |
+| `output_hash` | quale output, come catena hash incrementale |
 
-`evaluation_id` non include lo snapshot_hash di proposito: la stessa domanda
-(strategia, config, simbolo, istante) ha un solo identificativo, e se due run
-producono snapshot diversi per lo stesso `evaluation_id` è un errore rilevabile.
+Float codificati con i loro 64 bit esatti (`float.hex`), nessun arrotondamento.
+Il determinismo cross-platform viene dal vincolare il calcolo (solo operazioni
+IEEE correttamente arrotondate, in ordine fissato), non dal perdere precisione
+nell'hash. Stesso identificativo con contenuto diverso è un errore di integrità
+che interrompe il run.
 
 ---
 
 ## 5. Contratto del Strategy Engine (sintesi)
 
-`StrategyEvaluation` contiene: identificativi e versioni; `as_of`;
-`snapshot_hash`; `event` (evento strutturale o `None`); `outcome` che è
-**esattamente uno** tra `Candidate` e `Abstention`; la lista ordinata dei
-`FilterResult` (gate di qualità dati e filtri strategici, ciascuno con misura,
-soglia, comparatore, esito, `reason_code`); le misure usate; `next_state`.
+`evaluate(market_snapshot, strategy_config, strategy_state) -> StrategyEvaluation`.
+L'output contiene: la `EvaluationRequest`; `snapshot_hash`; gli eventi
+strutturali (con `event_id` unici); `outcome` che è **esattamente uno** tra
+`Candidate` e `Abstention`; tutti i filtri dichiarati in ordine, ciascuno con
+misura, soglia, comparatore, stato (`PASSED`, `FAILED`, `NOT_EVALUATED`) e
+`reason_code` se fallito; le misure; `next_state`; `evaluation_hash`.
 
-Codici di astensione iniziali (enum chiuso, estendibile solo con nuova versione):
-`INSUFFICIENT_HISTORY`, `DATA_GAP`, `INVALID_DATA`, `STALE_SNAPSHOT`,
-`MARKET_CLOSED`, `NO_EVENT`, `FILTER_REJECTED`, `INVALID_GEOMETRY`.
+Codici di astensione `contracts-v0.1`: `BAR_NOT_AVAILABLE`,
+`INSUFFICIENT_HISTORY`, `DATA_GAP`, `INVALID_DATA`, `FLAT_BAR_IN_WINDOW`,
+`MARKET_CLOSED`, `NO_EVENT`, `FILTER_REJECTED` (riservato), `INVALID_GEOMETRY`.
+`STALE_SNAPSHOT` è stato rimosso: la freschezza è ora espressa da
+`BAR_NOT_AVAILABLE`; la freschezza delle quote sarà un controllo di Execution (M3).
 
-Regola: la valutazione si ferma al primo gate fallito ma registra comunque tutti
-i gate e filtri valutati fino a quel punto; quelli non valutati compaiono con
-esito `NOT_EVALUATED`. Così l'audit distingue "fallito" da "non raggiunto".
-
-Il core non può: leggere orologi di sistema, generare numeri casuali senza seed
-passato in config, fare I/O, chiamare LLM, mutare input. Lo stato è un valore
-immutabile restituito come `next_state`.
+Il core non può leggere orologi, usare casualità non seminata, fare I/O,
+chiamare LLM o mutare input. Lo stato è un valore immutabile restituito come
+`next_state`.
 
 ---
 
 ## 6. Strategia baseline
 
-**`baseline_donchian_breakout` v1** su H1 (derivato da M15).
+**`baseline_donchian_breakout` v1** su H1 BID derivato da M15, senza stato,
+`research_only`. Definizione normativa completa in contracts §11; sintesi:
 
-- **Evento**: long se `close_t > max(high_{t-20..t-1})` e la barra precedente non
-  era già in breakout (evento "fresco"); short simmetrico su `min(low)`. Long e
-  short simultanei sono impossibili per costruzione.
-- **Gate dati** (non filtri strategici): storia contigua sufficiente (20 + 15
-  barre), nessun gap inatteso nella finestra, barre valide, ATR > 0, ultima barra
-  chiusa = barra attesa per `as_of`.
-- **Livelli**: `entry_ref = close_t` (riferimento, non prezzo eseguibile),
-  `stop = entry_ref ∓ 1.5 × ATR14(H1)`, `target = entry_ref ± 2 × |entry_ref − stop|`.
-- **Scadenza**: una barra H1.
-- **Nessun filtro discrezionale**: niente sessione, trend, volatilità, spread.
+- Finestra: 22 slot in sessione `t−21 … t`, dove `t` è lo slot che chiude a `C_k`
+  e gli indici contano solo slot del calendario (weekend e chiusure attese
+  saltati, non sono gap).
+- Canale: `U_t = max(high[t−20 … t−1])`, `L_t = min(low[t−20 … t−1])`, barra
+  corrente esclusa. Canale precedente su `t−21 … t−2`.
+- Evento fresco: LONG se `close_t > U_t` e `close_{t−1} <= U_{t−1}`; SHORT simmetrico
+  con disuguaglianze opposte. Disuguaglianza stretta sul breakout.
+- ATR14: media semplice di 14 True Range su `t−13 … t` (warm-up 15 slot), somma
+  sequenziale.
+- Livelli: `d = 1.5 × ATR`, stop a `d`, target a `2d` da `entry_ref = close_t`.
+- Sette gate in ordine fisso (barra di segnale valida, copertura, disponibilità,
+  validità, assenza di barre piatte, ATR > 0, slot di entrata in sessione), poi
+  evento, poi geometria. Qualunque slot non `VALID` nella finestra produce
+  astensione; nessun valore imputato. L'ultimo slot prima di una chiusura produce
+  `MARKET_CLOSED`.
+- Scadenza: fine dello slot successivo.
 
-Perché questa: è uno dei sistemi più semplici e documentati; l'evento è discreto
-e ha identità naturale; non ha stato; esercita tutto il motore (finestre
-multi-barra, ATR, gate di qualità, livelli, scadenza, astensioni). I parametri
-(20, 14, 1.5, 2) sono scelte ingegneristiche convenzionali, **fissate prima di
-vedere qualunque risultato e non ottimizzate**. Non è presentata come
-profittevole e non è abilitabile al trading da configurazione (ADR-0006).
+**Unica modifica di sostanza rispetto a M0 v0**: ATR14 come media semplice
+invece della ricorsione di Wilder. Motivo concreto: la ricorsione di Wilder ha
+memoria infinita, quindi il valore a `as_of` dipende da dove inizia il dataset e
+da come si riparte dopo un gap; questo rompe la riproducibilità tra dataset con
+inizio diverso e rende ambigue le regole sui gap. La media semplice ha memoria
+finita di 15 slot. Richiede la tua approvazione (§9, H1).
 
-Benchmark previsti in M2, nessuno in M1: entrata casuale con le stesse regole
-di stop/target e stessa frequenza; entrata sempre long; entrata sempre short.
+Perché Donchian: sistema semplice e documentato, evento discreto con identità
+naturale, nessuno stato, esercita tutto il motore. Parametri (20, 14, 1.5, 2)
+convenzionali, **congelati prima di qualunque risultato e non ottimizzati**. Non
+è presentata come profittevole e non è abilitabile al trading (ADR-0006).
+
+Benchmark previsti in M2, nessuno in M1: entrata casuale con le stesse regole di
+stop/target e stessa frequenza; sempre long; sempre short.
 
 ---
 
@@ -339,14 +397,16 @@ Fissato ora perché influenza i contratti; implementato solo in M3 dopo approvaz
 | Failure mode | Mitigazione | Test | Milestone |
 |---|---|---|---|
 | Lookahead (barra futura o incompleta nello snapshot) | Filtro `available_at <= as_of`, nessuna barra parziale | Property test perturbazione del futuro; test barra in formazione | M1 |
-| Doppia elaborazione della stessa candela | `evaluation_id` deterministico; sink idempotente; in M3 intento unico per `(event_id, account)` | Elaborare due volte la stessa barra → un solo record e un solo intento | M1/M3 |
+| Doppia elaborazione della stessa candela | `request_id` deterministico; stessa richiesta con contenuto diverso = errore di integrità; in M3 intento unico per `(event_id, account)` | Elaborare due volte la stessa barra → un solo record e un solo intento | M1/M3 |
 | Gap M15/H1/H4 | Valutazione guidata dal calendario; HTF solo con copertura completa | Dataset sintetici con gap in punti noti | M1 |
 | Timestamp incoerenti (fuori griglia, non monotoni, naive, DST) | Validatore; tipi UTC-aware; test transizioni DST USA/EU | Fixture dedicate | M1 |
 | Duplicati conflittuali | Rifiuto dell'import o esclusione marcata, mai scelta arbitraria | Fixture | M1 |
-| Prezzi invalidi, quote stale | Validatore; gate `INVALID_DATA`/`STALE_SNAPSHOT`; in M3 età massima tick | Fixture; broker simulato | M1/M3 |
-| Weekend/barre piatte trattate come mercato | Marcatura `NO_TRADE` e calendario | Fixture weekend Dukascopy | M1 |
-| Replay non riproducibile dopo restart | Checkpoint per `as_of`, scrittura idempotente | Kill a metà run + ripresa = stesso `output_hash` | M1 |
-| Non determinismo tra piattaforme | Niente parallelismo nel core, ordine di riduzione fisso, hash su valori canonici arrotondati alla precisione dello strumento | CI Linux + Windows con hash attesi | M1 |
+| Prezzi invalidi, quote stale | Validatore e file `rejected`; gate `INVALID_DATA`; barra non arrivata → `BAR_NOT_AVAILABLE`; in M3 età massima tick in Execution | T6.3, T2.1; broker simulato | M1/M3 |
+| Weekend/barre piatte trattate come mercato | Stato `FLAT_ZERO_VOLUME` in sessione, `CLOSED_FILLER` fuori sessione, calendario | T6.1, T6.2 | M1 |
+| Replay non riproducibile dopo restart | Segmenti su file temporaneo + `os.replace`, manifest come unico commit, catena hash, recupero con quarantena (ADR-0014) | Crash iniettato in ogni punto + ripresa = stesso `output_hash` (T5.1) | M1 |
+| Due replay sulla stessa destinazione | Lock esclusivo del sistema operativo, il secondo termina subito | T5.4 | M1 |
+| Mutazione di snapshot o parametri tramite alias | Buffer `bytes` propri, `FrozenMap`, `FrozenJson` (ADR-0012) | T3.1–T3.5 | M1 |
+| Non determinismo tra piattaforme | Solo operazioni IEEE correttamente arrotondate in ordine fissato, niente libm/riduzioni NumPy/parallelismo nel calcolo hashato; hash sui 64 bit esatti | CI Linux + Windows con hash attesi (T4.6) | M1 |
 | Ordine con risposta persa | Stato `UNKNOWN`, riconciliazione, nessun reinvio | Broker simulato che perde la risposta | M3 |
 | Broker disconnesso | Entrate sospese, protezione broker-side già presente | Failure injection | M3 |
 | Cambio account | Binding account, blocco entrate | Failure injection | M3 |
@@ -380,6 +440,16 @@ intendono accettate le raccomandazioni.
 | D9 | Lingua | tutto italiano; codice inglese e documenti italiani | **Codice e identificativi in inglese, documentazione e ADR in italiano.** |
 | D10 | Periodo storico (serve per M2, utile saperlo ora) | p.es. 2012–2025 | Proporre in M2 con split dev/validation/holdout prima di guardare i risultati. |
 
+Decisioni aggiunte dalla revisione v0.1:
+
+| # | Decisione | Opzioni | Raccomandazione |
+|---|---|---|---|
+| H1 | Definizione ATR14 della baseline | media semplice di 14 TR; Wilder su finestra fissa (seed SMA + N barre di ricorsione); Wilder su tutta la storia | **Media semplice**: memoria finita di 15 slot, nessun parametro di warm-up arbitrario. Wilder su tutta la storia è escluso perché dipende dall'inizio del dataset. |
+| H2 | Barra M15 piatta a volume zero in sessione | invalida la barra derivata e la finestra; trattata come valida; esclusa dagli indicatori | **Invalida** (astensione `FLAT_BAR_IN_WINDOW`), conservativo e visibile; rivedibile con dati sulla frequenza reale per simbolo. |
+| H3 | Valori di default in replay | `publication_delay = 0 s`, `evaluation_delay = 0 s`; valori positivi | **0 s e 0 s** in M1; in M3 si fissa il valore runtime di `evaluation_delay` e lo si usa anche nei test di parità. |
+| H4 | Candidato sull'ultimo slot prima di una chiusura | `MARKET_CLOSED`; candidato valido alla riapertura | **`MARKET_CLOSED`**: nessun candidato attraversa weekend o festività. |
+| H5 | Ripresa con codice diverso | `code_version` nel fingerprint (ripresa solo con lo stesso commit); escluso | **Incluso**: un run ripreso con codice diverso sarebbe un run diverso. |
+
 ---
 
 ## 10. Compromessi tecnici
@@ -391,7 +461,10 @@ intendono accettate le raccomandazioni.
 | Strategie senza stato (stato derivabile dallo snapshot) | Ripresa dopo restart banale, niente stato da migrare | Finestre di lookback ricalcolate a ogni passo |
 | Pydantic per i contratti, numpy per le serie | Validazione forte ai confini, velocità nei calcoli | Due rappresentazioni da tenere coerenti |
 | HTF derivati da M15 | Una sola sorgente di verità, gap tracciabili | Possibili differenze rispetto alle barre H1/H4 native del broker; misurate in M3 |
-| float64 per i calcoli, interi in punti all'execution | Semplicità e velocità | Hash su valori arrotondati alla precisione dello strumento per evitare differenze di ultimo bit |
+| float64 per i calcoli, interi in punti all'execution; hash sui bit esatti | Nessuna perdita di informazione negli hash | Il calcolo hashato è vincolato a operazioni IEEE deterministiche in ordine fissato (contracts §9.4) |
+| ATR a media semplice invece di Wilder | Memoria finita, indipendenza dall'inizio del dataset, regole sui gap semplici | Si discosta dalla definizione "classica" di Wilder |
+| `as_of` nominale anche in runtime | Replay e runtime identici a parità di osservazioni | Una barra arrivata pochi secondi dopo `T_k` produce un'astensione invece di un segnale |
+| Barra piatta in sessione invalida la finestra | Nessun dato dubbio entra negli indicatori | Possibili astensioni in più su simboli poco liquidi |
 | Parquet per audit e dataset, SQLite per lo stato operativo | Ognuno nel suo uso: analitico colonnare vs transazionale piccolo | Due tecnologie di storage |
 | Valutazione guidata dal calendario | Gap mai silenziosi | Calendario e chiusure da mantenere e versionare |
 | BID-only consentito con spread modellato | Molti più dati storici utilizzabili | Risultati marcati `MODELLED`, non confrontabili con quelli a spread osservato |
@@ -415,17 +488,23 @@ intendono accettate le raccomandazioni.
 6. `data.store`: dataset Parquet immutabili con manifest e `dataset_id`.
 7. `data.snapshot`: aggregazione M15 → H1/H4 con copertura completa; snapshot
    point-in-time.
-8. `strategy`: protocollo, registry, indicatori puri ATR14 (Wilder) e canale
-   Donchian, baseline v1.
-9. `replay`: scheduler da calendario, loop, checkpoint e ripresa idempotente,
-   manifest di run con `run_fingerprint` e `output_hash`.
-10. `audit`: scrittura Parquet delle valutazioni; comando `explain` (simbolo,
-    istante) che risponde con evento, gate/filtri, misure, soglie, motivo.
+8. `strategy`: protocollo, registry, indicatori puri (ATR14 a media semplice,
+   canale Donchian), baseline v1 come in contracts §11.
+9. `replay`: scheduler da calendario (contracts §7), loop, catena `output_hash`,
+   protocollo di checkpoint e ripresa crash-safe con lock (contracts §10),
+   comando `verify`.
+10. `audit`: segmenti Parquet + manifest; comando `explain` (simbolo, istante)
+    che risponde con richiesta, gate/filtri, misure, soglie, esito e annotazione
+    ex post marcata come tale.
 11. Generatore deterministico di dataset sintetici (con seed) con gap, weekend,
     DST, duplicati e prezzi invalidi in posizioni note.
 12. CLI: `fxnext data import`, `fxnext data inspect`, `fxnext replay run`,
     `fxnext replay verify`, `fxnext explain`.
 13. Documentazione: contratti aggiornati, ADR, esempio riproducibile.
+
+La revisione v0.1 non aggiunge elementi a questa lista: precisa come vanno
+realizzati i punti 2, 7, 8, 9 e 10. Lo scheduler di M1 include la sola funzione
+pura di classificazione `dispatch` (T2.4); il runtime che la usa resta in M3.
 
 ### Fuori da M1 (esplicitamente)
 
@@ -445,17 +524,137 @@ incrementi verificabili, ciascuno con test verdi prima del successivo.
 
 | # | Criterio | Come si verifica |
 |---|---|---|
-| A1 | Stessi input e configurazione producono gli stessi eventi e lo stesso `output_hash`. | Due run consecutivi; run su Linux e Windows in CI con hash di regressione committati. |
-| A2 | Nessun uso di candele future o incomplete. | Property test: per ogni `as_of` campionato, perturbare o aggiungere barre con `available_at > as_of` non cambia la valutazione. Test esplicito della barra in formazione. |
-| A3 | Gap e dati invalidi non ignorati. | Dataset sintetico con gap inattesi in posizioni note: il numero di astensioni `DATA_GAP` coincide esattamente con quello calcolato dalle posizioni dei gap e dalla lunghezza della finestra. Ogni riga invalida è conteggiata nel report di qualità con il suo motivo, e righe lette = righe accettate + righe escluse per motivo. |
-| A4 | Ogni valutazione termina con candidato o astensione motivata. | Invariante del tipo (validatore Pydantic) + test su tutte le valutazioni di un run: zero casi senza esito, zero astensioni senza `reason_code`. |
-| A5 | Replay riproducibile dopo restart. | Interruzione forzata a metà run + `replay run --resume` → `output_hash` identico al run ininterrotto, nessun record duplicato. |
-| A6 | Audit interrogabile. | `fxnext explain EURUSD 2024-03-12T10:15Z` restituisce la valutazione con tutti i gate/filtri, misure e soglie; per un istante senza valutazione prevista (weekend) risponde con il motivo di calendario. |
-| A7 | Suite automatica e regressione. | CI verde su Linux e Windows; test di architettura che falliscono se `domain`/`strategy` importano I/O; hash di regressione su dataset sintetico e sulla fixture reale. |
+| A1 | Stessi input e configurazione producono gli stessi eventi e lo stesso `output_hash`. | Due run consecutivi; run su Linux e Windows in CI con hash di regressione committati (T4.6). |
+| A2 | Nessun uso di candele future o incomplete. | T1.1–T1.6, T2.1. |
+| A3 | Gap e dati invalidi non ignorati. | Dataset sintetico con gap inattesi in posizioni note: il numero di astensioni `DATA_GAP`/`BAR_NOT_AVAILABLE` coincide esattamente con quello calcolato dalle posizioni dei gap e dalla lunghezza della finestra (22 slot). Righe lette = righe accettate + righe `rejected` per motivo + riempitivi `CLOSED_FILLER`. T6.1–T6.5. |
+| A4 | Ogni valutazione termina con candidato o astensione motivata. | Invariante del tipo + controllo su tutte le valutazioni di un run: zero casi senza esito, ogni `Abstention` ha `reason_code` uguale a quello del primo filtro `FAILED` (o `NO_EVENT`/`INVALID_GEOMETRY`), filtri dopo il primo fallito tutti `NOT_EVALUATED`. |
+| A5 | Replay riproducibile dopo restart. | T5.1–T5.6. |
+| A6 | Audit interrogabile. | `fxnext explain EURUSD 2024-03-12T10:15Z` restituisce richiesta, gate/filtri con misure e soglie, esito; per uno slot `UNAVAILABLE` aggiunge l'annotazione ex post marcata come tale; per un istante fuori sessione risponde con il motivo di calendario. |
+| A7 | Suite automatica e regressione. | CI verde su Linux e Windows; test di architettura (import-linter e tipi dei campi dei Model); hash di regressione. |
 | A8 | Esempio riproducibile. | Un comando documentato genera il dataset sintetico, esegue il replay e stampa `run_fingerprint` e `output_hash` attesi. (Revisione manuale.) |
 | A9 | Limiti dichiarati. | Sezione "limiti" nel report di M1. (Revisione manuale.) |
 
 Il numero di test passati non è un criterio: contano i criteri sopra.
+
+### Test di accettazione per i punti della revisione v0.1
+
+Ogni test è deterministico e ha un esito atteso esatto.
+
+**1. Disponibilità temporale nelle serie**
+
+- T1.1 Ogni `BarSeries` prodotta dal builder ha `available_at_ns` e `availability`
+  per ogni riga con prezzi; righe con prezzi e `available_at < close_time` →
+  `SeriesInvariantError`.
+- T1.2 Barra H1 derivata da quattro M15 con `available_at` 10:15:05, 10:30:02,
+  10:45:09, 11:00:03 (OBSERVED) → `available_at = 11:00:03`, `OBSERVED`. Con una
+  sola sorgente MODELLED → `MODELLED`.
+- T1.3 Una sorgente M15 con `available_at > as_of` → slot H1 `UNAVAILABLE` a quell'`as_of`
+  e `VALID` a un `as_of` successivo.
+- T1.4 Costruire a mano un `MarketSnapshot` con una barra `available_at > as_of`
+  → `SnapshotInvariantError` (il core non la riceve mai).
+- T1.5 Property test (hypothesis): per `as_of` casuali, modificare prezzi,
+  aggiungere o togliere barre con `available_at > as_of` lascia invariati
+  `snapshot_hash` ed `evaluation_hash` a `as_of`.
+- T1.6 Una barra con `close_time > as_of` non compare mai nello snapshot, anche se
+  ha un `available_at` (errato) precedente: il dataset la rifiuta in import.
+
+**2. Scheduling**
+
+- T2.1 Dataset OBSERVED in cui la barra di segnale arriva a `T_k + 1 s` →
+  astensione `BAR_NOT_AVAILABLE`; `explain` riporta ex post `LATE_ARRIVAL`.
+  Lo stesso slot senza barra → stessa astensione, ex post `MISSING`. I due
+  `evaluation_hash` sono identici (l'informazione ex post non entra nell'hash).
+- T2.2 Esattamente una `EvaluationRequest` per ogni `C_k` in sessione
+  nell'intervallo; nessuna fuori sessione; numero atteso calcolato dal calendario
+  per una settimana con cambio DST USA e una con cambio DST solo europeo.
+- T2.3 `as_of == C_k + evaluation_delay` per ogni richiesta; cambiare
+  `evaluation_delay` cambia `run_fingerprint` e `request_id`.
+- T2.4 (contratto per M3, testato in M1 sul solo scheduler puro) dati `T_k` e
+  `W_k`, `dispatch` vale `NOT_DISPATCHED_LATE` sse `W_k − T_k > max_dispatch_lateness`;
+  `evaluation_hash` è identico nei due casi.
+
+**3. Immutabilità**
+
+- T3.1 Su ogni colonna di `BarSeries`: assegnazione di elemento, `setflags(write=True)`
+  e scrittura su una vista → eccezione.
+- T3.2 Modificare l'array NumPy passato al costruttore dopo la costruzione non
+  cambia la serie né il suo hash.
+- T3.3 `FrozenMap` e `FrozenJson`: `__setitem__`, `update`, `append` su liste
+  annidate impossibili; un `dict` o `list` in un campo `Model` → errore di validazione.
+- T3.4 Test di architettura: nessun campo di `Model` con tipo `list`, `dict`,
+  `set`, `bytearray`, `np.ndarray`.
+- T3.5 Per ogni valutazione del run di regressione, `content_hash` di snapshot,
+  config e stato è uguale prima e dopo `evaluate`.
+
+**4. Identità e hashing**
+
+- T4.1 Vettori di test dello schema `fxnext-hash-v1` (oggetto → byte canonici →
+  hash) committati e verificati: ordine delle chiavi, `None` esplicito, frozenset
+  ordinato, `-0.0 == 0.0`, NaN rifiutato, datetime in ns.
+- T4.2 Due float che differiscono di 1 ULP producono hash diversi.
+- T4.3 Cambiare `stop_atr_mult` cambia `config_hash` e `candidate_id` ma non
+  `event_id`; cambiare `channel_slots` cambia anche `event_id`.
+- T4.4 Due eventi con lo stesso `event_id` nella stessa valutazione →
+  `DuplicateEventError`; due eventi sulla stessa barra e direzione con
+  discriminanti diversi → `event_id` diversi.
+- T4.5 Store di audit con stessa `request_id` e `evaluation_hash` diverso nello
+  stesso run → `IntegrityError`.
+- T4.6 `output_hash` del run di regressione identico su Linux e Windows.
+- T4.7 Test di architettura: il core non chiama `math.exp/log/sqrt/pow`, `np.sum`,
+  `np.mean` su grandezze hashate (lint mirato sul package `strategy`).
+
+**5. Audit e checkpoint**
+
+- T5.1 Iniezione di crash (eccezione a un punto di iniezione e, in un secondo test,
+  `kill` del sottoprocesso) in ciascun punto: durante la scrittura del `.tmp`,
+  dopo il suo `fsync`, dopo `os.replace` del segmento, dopo la scrittura di
+  `manifest.json.tmp`, dopo il commit del manifest. Per ciascuno, `--resume` →
+  `output_hash` identico al run ininterrotto.
+- T5.2 Dopo ogni ripresa: `request_id` unici, `seq` contigui, orfani spostati in
+  `quarantine/`, `verify` verde.
+- T5.3 Un bit modificato in un segmento committato → la ripresa e `verify`
+  falliscono con `IntegrityError`, nessuna scrittura.
+- T5.4 Due processi di replay sulla stessa destinazione → il secondo termina con
+  `DestinationLocked` entro 1 s e non crea file.
+- T5.5 Il lock è rilasciato alla morte del processo: dopo `kill` del primo, una
+  ripresa acquisisce il lock senza intervento manuale.
+- T5.6 `explain` durante un run in corso legge solo i segmenti elencati nel
+  manifest e mai i `.tmp`.
+
+**6. Qualità delle barre e prezzi**
+
+- T6.1 Barra piatta a volume zero in sessione → riga `FLAT_ZERO_VOLUME` nel
+  dataset, slot H1 che la contiene non `VALID`, astensione `FLAT_BAR_IN_WINDOW`
+  per le 22 valutazioni la cui finestra la include.
+- T6.2 Barra piatta fuori sessione → conteggiata `CLOSED_FILLER`, assente dalle
+  serie, nessuna astensione.
+- T6.3 Riga con `high < close` → nel file `rejected` con motivo, slot `INVALID`,
+  astensione `INVALID_DATA`.
+- T6.4 Duplicato identico → deduplicato e contato; duplicato conflittuale →
+  entrambe in `rejected` con `CONFLICTING_DUPLICATE`, slot `INVALID`.
+- T6.5 Un run con dataset `SYNTHETIC` e uno `REAL` insieme → rifiutato prima di
+  iniziare.
+- T6.6 Ogni `Candidate` della baseline ha `level_basis = BID` e `entry_ref`
+  uguale al `close` BID dello slot di segnale.
+
+**7. Baseline Donchian**
+
+- T7.1 Vettori calcolati a mano (fixture di 30 slot): `U_t`, `L_t`, `U_{t−1}`,
+  `L_{t−1}`, `ATR_t`, `stop`, `target` confrontati a livello di bit.
+- T7.2 `close_t == U_t` → `NO_EVENT`; `close_t > U_t` con `close_{t−1} > U_{t−1}`
+  (breakout già in corso) → `NO_EVENT`.
+- T7.3 Il massimo della barra `t` superiore a tutto il canale non cambia `U_t`.
+- T7.4 Finestra che attraversa il weekend senza buchi → nessun `DATA_GAP`;
+  stessa finestra con uno slot del giovedì mancante → `DATA_GAP` per le
+  valutazioni che lo includono.
+- T7.5 Prime 21 valutazioni dopo `coverage_start` → `INSUFFICIENT_HISTORY`; la
+  22ª passa il gate.
+- T7.6 Slot venerdì 16:00–17:00 NY e slot prima di una chiusura attesa →
+  `MARKET_CLOSED`.
+- T7.7 Ordine dei gate: una finestra con slot `UNAVAILABLE` e `INVALID` produce
+  `DATA_GAP` (gate 3 prima del 4), con gate 4–7 `NOT_EVALUATED`.
+- T7.8 Valutazione dello stesso `as_of` su dataset che iniziano in date diverse
+  (entrambi con ≥ 22 slot prima) → `evaluation_hash` identico (memoria finita).
 
 ### Milestone successive (sintesi, da dettagliare all'inizio di ciascuna)
 
@@ -481,8 +680,9 @@ Il numero di test passati non è un criterio: contano i criteri sopra.
 | Unit | Tipi, calendario (DST USA/EU, weekend, chiusure), indicatori contro valori calcolati a mano, regole di validazione, hashing canonico | M1 |
 | Property-based (hypothesis) | Perturbazione del futuro; idempotenza della doppia elaborazione; invarianti di aggregazione HTF (high = max, low = min, open primo, close ultimo); ogni valutazione ha un esito | M1 |
 | Golden/regressione | Hash di output su dataset sintetico e fixture reale | M1 |
-| Replay e restart | Interruzione e ripresa, run concorrenti sullo stesso output rifiutati | M1 |
-| Architettura | import-linter: regole di dipendenza | M1 |
+| Replay e restart | Crash iniettato in ciascun punto del protocollo (eccezione e kill del processo), ripresa, corruzione di segmento, lock concorrente (T5.x) | M1 |
+| Immutabilità e hashing | Tentativi di mutazione, alias NumPy, vettori di test dello schema hash, 1 ULP, collisioni simulate (T3.x, T4.x) | M1 |
+| Architettura | import-linter: regole di dipendenza; tipi dei campi dei Model; funzioni vietate nel core | M1 |
 | Parità | Replay vs runtime con broker simulato su snapshot identici | M2 |
 | Simulatore | Casi intrabar ambigui, gap all'apertura, costi, latenza | M2 |
 | Integrazione broker simulato | Risposta persa, disconnessione, cambio account, crash tra persistenza e invio, posizione orfana, discordanza temporanea, fill parziale, quote stale | M3 |
@@ -523,3 +723,10 @@ Riportato ora perché vincola i contratti di M1 (identità, versioni, dataset).
   retcode del broker che userai va verificato in M3 sul terminale reale.
 - I tempi di replay (NFR-8) sono una stima da misurare in M1.
 - La fixture reale dipende da D2.
+- Revisioni di barre già osservate (dati bitemporali) non sono supportate in
+  `contracts-v0.1`: un secondo valore per lo stesso slot è un conflitto. Andrà
+  rivisto in M3 se il broker corregge barre già pubblicate.
+- Il `fsync` della directory non esiste su Windows: un crash di sistema operativo
+  (non di processo) subito dopo `os.replace` potrebbe perdere l'ultimo commit,
+  che verrebbe ricalcolato alla ripresa senza effetti sull'`output_hash`.
+- I confini di segmento mensili sono una scelta di comodità; non influenzano gli hash.

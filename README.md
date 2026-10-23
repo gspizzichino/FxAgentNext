@@ -3,7 +3,7 @@
 Piattaforma di ricerca quantitativa e trading Forex, ricostruita da zero.
 Nessun trading reale è abilitato per default.
 
-Stato: **M0 — specifica e design, in attesa di approvazione.** Non c'è ancora
+Stato: **M0 — specifica e design (revisione v0.1, contracts-v0.1), in attesa di approvazione.** Non c'è ancora
 codice applicativo.
 
 - [Specifica M0](docs/M0-specifica.md)
