@@ -1,6 +1,6 @@
 # Contratti — FxAgent Next
 
-Stato: **bozza M0** · Versione contratti: `contracts-v0.1` (non ancora `v1`)
+Stato: **bozza M0** · Versione contratti: `contracts-v0.2` (non ancora `v1`)
 
 Pseudocodice Python 3.12. I nomi sono quelli che userà il codice. Le regole
 normative sono marcate **DEVE** / **NON DEVE**. Le decisioni dietro i contratti
@@ -11,6 +11,8 @@ sono in [ADR-0002](adr/0002-modello-del-tempo.md), [0005](adr/0005-base-di-prezz
 
 ## Changelog
 
+- **v0.2** (2026-11-02): sorgente Dukascopy con downloader e cache grezza (§13,
+  ADR-0015). Nessun altro contratto cambia.
 - **v0.1** (2026-10-23): `available_at` e `availability` per ogni osservazione
   anche in forma colonnare; serie allineate agli slot del calendario con stato
   esplicito; disponibilità delle barre derivate; scheduling (`as_of = chiusura
@@ -621,7 +623,50 @@ Comportamenti:
   li registra separatamente con `Provenance`. I livelli del candidato non vengono
   mai sovrascritti.
 
-## 13. Contratti futuri (solo nomi)
+## 13. Sorgente Dukascopy (ADR-0015)
+
+```python
+class RawFetchStatus(StrEnum):
+    OK = "OK"                     # file scaricato e decompresso correttamente
+    EMPTY = "EMPTY"               # 200 con corpo vuoto: nessun dato quel giorno
+    NOT_FOUND = "NOT_FOUND"       # 404
+    FAILED = "FAILED"             # errori transitori oltre il limite di tentativi
+    CORRUPT = "CORRUPT"           # corpo troncato o LZMA non valido
+    SOURCE_CHANGED = "SOURCE_CHANGED"   # nuovo download con byte diversi dal file in cache
+
+class RawFetchRecord(Model):      # una riga per tentativo concluso, append-only (JSONL)
+    url: str
+    symbol: str; basis: PriceBasis
+    day: date                     # giorno UTC del file
+    status: RawFetchStatus
+    http_status: int | None
+    attempts: int
+    bytes: int
+    sha256: str | None            # dei byte compressi
+    cache_path: str | None
+    fetched_at: AwareDatetime
+    downloader_version: str
+```
+
+- URL: `https://datafeed.dukascopy.com/datafeed/{SYMBOL}/{YYYY}/{MM-1:02d}/{DD:02d}/{BID|ASK}_candles_min_1.bi5`
+  (mese a base 0, giorno UTC).
+- Cache: `data/raw/dukascopy/{SYMBOL}/{BASIS}/{YYYY}/{YYYY-MM-DD}.{sha256[:12]}.bi5`,
+  scritta con `.tmp` + `os.replace`, mai sovrascritta. Più versioni dello stesso
+  giorno possono coesistere; l'import usa quella indicata dal log (la prima `OK`,
+  salvo scelta esplicita).
+- Parser: record da 24 byte big-endian `(secondi dall'inizio del giorno: u32,
+  open, close, low, high: i32, volume: f32)`, prezzo = intero / 10^digits della
+  sorgente (5, 3 per JPY). Da confermare su un file reale prima di `v1`.
+- Aggregazione M1 → M15: richiede i 15 record del quarto d'ora; un minuto assente
+  → M15 `INVALID` (`INCOMPLETE_SOURCE`); tutti i 15 piatti a volume zero →
+  `FLAT_ZERO_VOLUME`; altrimenti O = primo open, H = max, L = min, C = ultimo
+  close, volume = somma sequenziale. Le M15 fuori sessione seguono §3 (`CLOSED_FILLER`).
+- Controllo incrociato BID/ASK sulla stessa M15: `ask_open >= bid_open` e
+  `ask_close >= bid_close`; violazione → entrambe `INVALID` (`NEGATIVE_SPREAD`).
+- `dataset_id` dipende dal contenuto canonico delle righe; il manifest elenca
+  anche gli `sha256` dei file grezzi usati e la `parser_version`.
+
+## 14. Contratti futuri (solo nomi)
 
 - M2: `CostModel`, `ExecutionModel`, `SimulatedFill`, `Outcome`, `ExperimentSpec`, `MetricsReport`.
 - M3: `AccountIdentity`, `SymbolSpec`, `RiskDecision`, `OrderIntent`, `OrderState`,

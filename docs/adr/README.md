@@ -21,3 +21,4 @@ l'accettazione si cambia solo con un nuovo ADR.
 | [0012](0012-immutabilita-profonda.md) | Immutabilità profonda di snapshot, serie, parametri e JSON | Proposta |
 | [0013](0013-identita-e-hashing.md) | Identità separate e schema di hash `fxnext-hash-v1` | Proposta |
 | [0014](0014-audit-crash-safe.md) | Protocollo crash-safe per audit Parquet e checkpoint | Proposta |
+| [0015](0015-downloader-dukascopy.md) | Downloader Dukascopy con cache grezza immutabile | Proposta |

@@ -1,7 +1,7 @@
 # FxAgent Next — M0: specifica e design
 
 Stato: **proposta, in attesa di approvazione** · Revisione: v0.1 (2026-10-23) · Milestone: M0
-Contratti: `contracts-v0.1`
+Contratti: `contracts-v0.2`
 
 Questo documento è la specifica M0. Non contiene codice applicativo. Contratti
 dettagliati in [contracts.md](contracts.md), decisioni in [adr/](adr/README.md).
@@ -14,6 +14,10 @@ immutabilità profonda (§4.7); identità separate e hashing senza arrotondament
 (§4.8); protocollo audit/checkpoint crash-safe (contracts §10); baseline
 formalizzata con ATR a media semplice (§6). Nuovi ADR 0012–0014; ADR-0010
 sostituito da 0013. Test di accettazione per ciascun punto in §12.
+
+**Decisione D2 (2026-11-02).** Giacomo ha scelto il downloader Dukascopy in M1.
+Aggiunti: FR-D7, ADR-0015, contracts §13 (`contracts-v0.2`), test T8.x. Il
+download è l'unico comando che usa la rete; import e replay restano offline.
 
 ---
 
@@ -77,7 +81,8 @@ macro, PolicyCandidate/shadow governance, ZeroMQ, Streamlit come control plane.
 
 | ID | Requisito | Milestone |
 |---|---|---|
-| FR-D1 | Importare dati OHLC storici da file (formato Dukascopy CSV e formato generico) per BID e, se disponibile, ASK. | M1 |
+| FR-D1 | Importare dati OHLC storici dalla cache grezza Dukascopy (candele M1 BID e ASK) e da CSV generico. | M1 |
+| FR-D7 | Scaricare dal datafeed pubblico Dukascopy le candele M1 giornaliere BID e ASK in una cache grezza immutabile, riprendibile e verificata da hash. | M1 |
 | FR-D2 | Validare ogni dataset: ordinamento, duplicati identici/conflittuali, timestamp fuori griglia, coerenza OHLC, prezzi non positivi/non finiti, ask < bid, barre piatte a volume zero, gap. Produrre un report di qualità persistito. | M1 |
 | FR-D3 | Archiviare dataset immutabili e versionati (Parquet + manifest con hash del contenuto e della sorgente). | M1 |
 | FR-D4 | Derivare H1/H4 da M15 solo con copertura completa; barre parziali assenti e marcate. | M1 |
@@ -104,7 +109,7 @@ macro, PolicyCandidate/shadow governance, ZeroMQ, Streamlit come control plane.
 |---|---|---|
 | NFR-1 Determinismo | Stessi dataset + config + versione codice → stesso hash di output del run, su Linux e Windows. | Test di regressione con hash attesi, CI su entrambe le piattaforme. |
 | NFR-2 No lookahead | Modificare o aggiungere dati dopo `as_of` non cambia la valutazione a `as_of`. | Property test "perturbazione del futuro". |
-| NFR-3 Offline | Tutta M1/M2 gira senza rete e senza MT5, su Windows. | CI senza rete; MT5 non è una dipendenza di installazione base. |
+| NFR-3 Offline | Tutta M1/M2 gira senza rete e senza MT5, su Windows, tranne `fxnext data download`. | CI senza rete (downloader testato con server HTTP locale); MT5 non è una dipendenza di installazione base. |
 | NFR-4 Isolamento | `domain` e `strategy` non importano I/O, DB, broker, LLM, UI. | Test di architettura (import-linter) in CI. |
 | NFR-5 Tracciabilità | Ogni output referenzia dataset_id, config_hash, strategy_version, engine_version, git sha. | Schema del manifest di run validato. |
 | NFR-6 Sicurezza | Trading reale disattivato per default; credenziali mai nel repo; dipendenze bloccate da lockfile. | Test di config + scansione segreti. |
@@ -141,7 +146,7 @@ di esterno, gli adapter dipendono dal core.
 |---|---|---|---|
 | `fxnext.domain` | Tipi immutabili (Instrument, Timeframe, Bar, BarSeries, Quote, MarketSnapshot, StrategyEvaluation, FilterResult, ReasonCode), modello del tempo, calendario FX, hashing canonico. | stdlib, pydantic, numpy | M1 |
 | `fxnext.strategy` | Protocollo `Strategy`, registry versionato, baseline, indicatori puri (ATR, canali). | domain | M1 |
-| `fxnext.data.sources` | Adapter di lettura: Dukascopy CSV, CSV generico. In M3 adapter MT5 storico. | domain | M1 |
+| `fxnext.data.sources` | Downloader Dukascopy verso cache grezza; parser `.bi5`; CSV generico. In M3 adapter MT5 storico. | domain, stdlib (`urllib`, `lzma`) | M1 |
 | `fxnext.data.validate` | Regole di validazione e report di qualità. | domain | M1 |
 | `fxnext.data.store` | Dataset Parquet immutabili + manifest; lettura per intervallo. | domain, pyarrow | M1 |
 | `fxnext.data.snapshot` | Costruzione snapshot point-in-time e aggregazione HTF. | domain | M1 |
@@ -188,7 +193,7 @@ il consumatore (Risk/Execution). M2 include un test di parità: stessi snapshot
 
 ## 4. Modello del tempo e dei dati
 
-Le definizioni normative sono in [contracts.md](contracts.md) (`contracts-v0.1`);
+Le definizioni normative sono in [contracts.md](contracts.md) (`contracts-v0.2`);
 qui la sintesi e le motivazioni.
 
 ### 4.1 Tempo e disponibilità
@@ -430,7 +435,7 @@ intendono accettate le raccomandazioni.
 | # | Decisione | Opzioni | Raccomandazione |
 |---|---|---|---|
 | D1 | Simboli M1 | solo EURUSD; EURUSD+GBPUSD+USDJPY | **EURUSD, GBPUSD, USDJPY** (USDJPY esercita una precisione a 3 decimali diversa). |
-| D2 | Fonte dati storici M1 | file Dukascopy importati; downloader integrato; export MT5 | **Import da file Dukascopy (BID + ASK M15) e CSV generico.** Niente downloader in M1. Dati reali non committati nel repo (licenza e dimensione); test su dati sintetici + piccola fixture. Mi serve sapere se puoi fornire i file o se preferisci che in M1 aggiunga un downloader opzionale. |
+| D2 | Fonte dati storici M1 | file Dukascopy importati; downloader integrato; export MT5 | **Deciso da Giacomo il 2026-11-02: downloader integrato** (ADR-0015). Dati reali non committati nel repo; test su dati sintetici e server HTTP locale. |
 | D3 | Allineamento H4/D1 | chiusura NY 17:00; mezzanotte UTC | **Chiusura NY**, coerente con la maggior parte dei server MT5 UTC+2/+3. |
 | D4 | Baseline | Donchian breakout; incrocio medie; solo benchmark casuale | **Donchian breakout 20 su H1**, parametri §6. |
 | D5 | Libreria dati | pandas; polars; pyarrow + numpy | **pyarrow + numpy** nel codice applicativo, **DuckDB** per le query di audit/ricerca. Niente pandas nel core. |
@@ -483,7 +488,9 @@ Decisioni aggiunte dalla revisione v0.1:
    StrategyConfig, StrategyState, FilterResult, StructuralEvent, Candidate,
    Abstention, ReasonCode, StrategyEvaluation; hashing canonico.
 3. Calendario FX con DST e chiusure attese versionate.
-4. `data.sources`: lettura Dukascopy CSV (BID, ASK) e CSV generico documentato.
+4. `data.sources`: downloader Dukascopy (candele M1 giornaliere BID e ASK, cache
+   grezza con log e hash, ripresa, retry solo per errori transitori), parser
+   `.bi5`, aggregazione M1 → M15, CSV generico documentato (ADR-0015).
 5. `data.validate`: regole FR-D2 e report di qualità.
 6. `data.store`: dataset Parquet immutabili con manifest e `dataset_id`.
 7. `data.snapshot`: aggregazione M15 → H1/H4 con copertura completa; snapshot
@@ -498,7 +505,7 @@ Decisioni aggiunte dalla revisione v0.1:
     ex post marcata come tale.
 11. Generatore deterministico di dataset sintetici (con seed) con gap, weekend,
     DST, duplicati e prezzi invalidi in posizioni note.
-12. CLI: `fxnext data import`, `fxnext data inspect`, `fxnext replay run`,
+12. CLI: `fxnext data download`, `fxnext data import`, `fxnext data inspect`, `fxnext replay run`,
     `fxnext replay verify`, `fxnext explain`.
 13. Documentazione: contratti aggiornati, ADR, esempio riproducibile.
 
@@ -510,7 +517,7 @@ pura di classificazione `dispatch` (T2.4); il runtime che la usa resta in M3.
 
 Simulatore e modello costi, outcome, metriche, walk-forward, benchmark; qualsiasi
 codice MT5; Risk, Execution, Position Management, SQLite operativo, kill switch;
-runtime live o paper; downloader di rete; strategie oltre la baseline; filtri
+runtime live o paper; download di tick o di fonti diverse da Dukascopy; strategie oltre la baseline; filtri
 discrezionali; AI; dashboard; ottimizzazione parametri; D1 e timeframe sotto M15.
 
 Volume atteso: dell'ordine di 25–35 file di codice sorgente più test, in 4–6
@@ -656,6 +663,33 @@ Ogni test è deterministico e ha un esito atteso esatto.
 - T7.8 Valutazione dello stesso `as_of` su dataset che iniziano in date diverse
   (entrambi con ≥ 22 slot prima) → `evaluation_hash` identico (memoria finita).
 
+**8. Downloader Dukascopy (D2)**
+
+- T8.1 Server HTTP locale (stdlib) che serve file `.bi5` generati dai test con
+  contenuto noto: download di 3 giorni BID e ASK → cache con 6 file, log con URL,
+  stato, byte e `sha256`; import → M15 identiche ai valori attesi.
+- T8.2 URL costruiti con mese a base 0 e giorno UTC: 2024-01-31 →
+  `.../2024/00/31/BID_candles_min_1.bi5`; prezzi di USDJPY divisi per 10^3, EURUSD per 10^5.
+- T8.3 Risposta 200 con corpo vuoto → giorno `EMPTY` registrato, nessun errore;
+  404 → `NOT_FOUND` registrato; nessuno dei due crea barre.
+- T8.4 500 due volte poi 200 → file scaricato dopo esattamente 3 tentativi con
+  backoff; 500 oltre il limite → giorno `FAILED`, comando esce con codice ≠ 0, il
+  resto della cache resta valido.
+- T8.5 Corpo troncato o LZMA corrotto → `CORRUPT`, nessun file nella cache, nessun
+  `.tmp` rimasto.
+- T8.6 Interruzione a metà download e nuovo avvio → solo i giorni mancanti
+  vengono richiesti (contatore richieste del server di test).
+- T8.7 Un riscaricamento che produce byte diversi da quelli in cache → il file
+  esistente non viene sovrascritto, nuova versione conservata accanto, evento
+  `SOURCE_CHANGED` nel log; `dataset_id` di un import già fatto non cambia.
+- T8.8 Giorni non ancora interamente trascorsi (fine giorno UTC + margine > ora
+  corrente) non vengono richiesti.
+- T8.9 Minuto mancante nel file del giorno → M15 corrispondente `INVALID`
+  (`INCOMPLETE_SOURCE`); 15 minuti piatti a volume zero → `FLAT_ZERO_VOLUME`;
+  `ask_open < bid_open` o `ask_close < bid_close` → entrambe le M15 `INVALID` (`NEGATIVE_SPREAD`).
+- T8.10 Due import della stessa cache, anche su Windows e Linux → stesso `dataset_id`.
+
+
 ### Milestone successive (sintesi, da dettagliare all'inizio di ciascuna)
 
 - **M2**: simulatore con assunzioni versionate e risultati marcati `MODELLED`;
@@ -722,7 +756,9 @@ Riportato ora perché vincola i contratti di M1 (identità, versioni, dataset).
 - Il comportamento esatto dell'offset server MT5, dei filling mode e dei
   retcode del broker che userai va verificato in M3 sul terminale reale.
 - I tempi di replay (NFR-8) sono una stima da misurare in M1.
-- La fixture reale dipende da D2.
+- Formato `.bi5` delle candele (ordine dei campi, divisore dei prezzi, presenza dei
+  minuti senza tick) da confermare su un file reale prima di congelare il parser;
+  l'ambiente cloud attuale non raggiunge `datafeed.dukascopy.com`.
 - Revisioni di barre già osservate (dati bitemporali) non sono supportate in
   `contracts-v0.1`: un secondo valore per lo stesso slot è un conflitto. Andrà
   rivisto in M3 se il broker corregge barre già pubblicate.
