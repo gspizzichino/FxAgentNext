@@ -1,7 +1,7 @@
-# FxAgent Next — M2: specifica (bozza da approvare)
+# FxAgent Next — M2: specifica
 
-Stato: **bozza 2026-11-03**, nessun codice M2 scritto. Le decisioni E1–E8 (§10)
-vanno approvate prima di iniziare. Riferimenti: [M0-specifica.md](M0-specifica.md)
+Stato: **approvata 2026-11-03**, decisioni E1–E8 (§10) come proposte.
+Riferimenti: [M0-specifica.md](M0-specifica.md)
 §2 (FR-R2, FR-R3), §6, §13, §14; [contracts.md](contracts.md) §11–§12.
 
 ## 0. Sintesi
@@ -239,7 +239,7 @@ Dati: dall'1 gennaio 2015 al 31 ottobre 2026 (D10).
   walk-forward diventa una valutazione per finestre annuali scorrevoli. La
   macchina "stima su train, valuta su test" si costruisce e si testa, ma per la
   baseline la stima è l'identità. Servirà dalle proposte di M4.
-- **Pre-registrazione**: ogni esperimento è un file YAML congelato con
+- **Pre-registrazione**: ogni esperimento è un file TOML congelato con
   strategia, config, `dataset_id`, split, modello di esecuzione e costi, e i
   criteri di §9. Il suo hash entra nel fingerprint del run e nel report.
 - **Holdout sigillato**: il runner rifiuta un intervallo che tocca l'holdout se
@@ -370,3 +370,25 @@ M3.
 
 Ogni passo si chiude con test verdi in CI su Linux e Windows. Il report finale di
 M2 riporta i risultati così come sono, anche se negativi o inconcludenti.
+
+## 14. Precisazioni nate dall'implementazione (2026-11-03)
+
+Nessuna di queste cambia una decisione approvata.
+
+- La pre-registrazione è in **TOML** invece che in YAML, perché Python lo legge
+  senza dipendenze nuove (`tomllib`).
+- Gli **split** sono costanti nel codice (`fxnext.research.protocol.SPLITS`). Un
+  esperimento sceglie lo split ma non può spostarne i confini.
+- La **regola del gap** (§3.4) si applica all'apertura di ogni minuto, escluso
+  quello di entrata. Su dati continui non scatta quasi mai, ma copre anche i
+  salti dentro la sessione.
+- Il **risultato di un esperimento** si scrive tutto insieme (directory
+  temporanea più `os.replace`) sotto il suo fingerprint. Se il processo si
+  interrompe, si ricalcola da capo. Il replay sottostante resta crash-safe e
+  riprendibile come in ADR-0014.
+- Sulla validazione l'esito positivo si chiama **`VALIDATION_PASSED`**, perché
+  `CANDIDATE_FOR_DEMO` richiede anche l'holdout (§9).
+- I candidati che si fermano a `END_OF_DATA` (percorso finito prima dell'uscita)
+  sono esclusi dalle metriche e contati nella copertura.
+- I **minuti senza tick** (piatti, volume zero) valgono per le uscite ma non per
+  l'entrata.

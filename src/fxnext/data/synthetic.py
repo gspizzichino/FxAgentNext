@@ -113,8 +113,61 @@ def synthetic_bi5_day(
     return bi5.encode(candles)
 
 
+def synthetic_raw_cache(
+    cache_root: object,
+    symbol: str,
+    start: date,
+    end: date,
+    *,
+    seed: int = 11,
+    spread_points: int = 3,
+    start_points: int = 110_000,
+) -> None:
+    """Fill a raw cache with chained synthetic BID days and ASK = BID + spread (tests, demo)."""
+
+    import hashlib
+    from pathlib import Path
+
+    from fxnext.data.dukascopy import FetchStatus, RawCache, iter_days
+    from fxnext.domain.enums import PriceBasis
+
+    cache = RawCache(Path(str(cache_root)))
+    price = start_points
+    for n, day in enumerate(iter_days(start, end)):
+        bid = synthetic_bi5_day(day, seed=seed * 1000 + n, start_points=price)
+        candles = bi5.decode(bid)
+        price = candles[-1].close
+        ask = bi5.encode(
+            [
+                bi5.MinuteCandle(
+                    c.second_of_day,
+                    c.open + spread_points,
+                    c.close + spread_points,
+                    c.low + spread_points,
+                    c.high + spread_points,
+                    c.volume,
+                )
+                for c in candles
+            ]
+        )
+        for basis, payload in ((PriceBasis.BID, bid), (PriceBasis.ASK, ask)):
+            stored = cache.store(symbol, basis, day, payload)
+            cache.append(
+                {
+                    "symbol": symbol,
+                    "basis": basis.value,
+                    "day": day.isoformat(),
+                    "status": FetchStatus.OK,
+                    "sha256": hashlib.sha256(payload).hexdigest(),
+                    "cache_path": stored.relative_to(cache.root).as_posix(),
+                    "bytes": len(payload),
+                    "synthetic": True,
+                }
+            )
+
+
 def day_start(day: date) -> datetime:
     return datetime(day.year, day.month, day.day, tzinfo=UTC)
 
 
-__all__ = ["day_start", "synthetic_bi5_day", "synthetic_m15", "timedelta"]
+__all__ = ["day_start", "synthetic_bi5_day", "synthetic_m15", "synthetic_raw_cache", "timedelta"]

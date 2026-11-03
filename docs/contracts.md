@@ -1,6 +1,6 @@
 # Contratti — FxAgent Next
 
-Stato: **bozza M0** · Versione contratti: `contracts-v0.2` (non ancora `v1`)
+Stato: **bozza** · Versione contratti: `contracts-v0.3` (non ancora `v1`)
 
 Pseudocodice Python 3.12. I nomi sono quelli che userà il codice. Le regole
 normative sono marcate **DEVE** / **NON DEVE**. Le decisioni dietro i contratti
@@ -11,6 +11,8 @@ sono in [ADR-0002](adr/0002-modello-del-tempo.md), [0005](adr/0005-base-di-prezz
 
 ## Changelog
 
+- **v0.3** (2026-11-03, M2): percorso M1 BID/ASK `m1-path-v1` e contratti di
+  ricerca (§15, ADR-0016). I contratti del core non cambiano.
 - **v0.2.1** (2026-11-03, implementazione M1): `Timeframe.M1` per la sola sorgente;
   `dataset_id` calcolato sugli sha256 delle colonne canoniche (equivalente alle
   righe canoniche, indipendente dal writer Parquet); `evaluate()` costruisce da sé
@@ -673,7 +675,69 @@ class RawFetchRecord(Model):      # una riga per tentativo concluso, append-only
 
 ## 14. Contratti futuri (solo nomi)
 
-- M2: `CostModel`, `ExecutionModel`, `SimulatedFill`, `Outcome`, `ExperimentSpec`, `MetricsReport`.
 - M3: `AccountIdentity`, `SymbolSpec`, `RiskDecision`, `OrderIntent`, `OrderState`,
   `BrokerPosition`, `ReconciliationReport`, `KillSwitch`.
 - M4: `ResearchProposal`.
+
+## 15. Ricerca (M2, ADR-0016)
+
+Queste strutture vivono in `fxnext.research` e `fxnext.data.path`, fuori dal core.
+
+```python
+class PricePath:                     # schema "m1-path-v1"
+    path_id: str                     # H("PricePath/1", meta + sha256 delle colonne)
+    symbol: str
+    provenance: DatasetProvenance
+    coverage_start_ns: int
+    coverage_end_ns: int
+    # colonne: t_ns, status (VALID | FLAT), bid_open..bid_close, ask_open..ask_close
+    # solo minuti in sessione con BID e ASK entrambi osservati e ask >= bid su open e close
+
+class ExecParams(Model):             # "exec-model-v1"
+    latency_minutes: int = 0
+    time_exit_slots: int = 120       # slot H1 in sessione, contando quello di entrata
+    path_gap_minutes: int = 60
+    ambiguity: "STOP_FIRST" | "TARGET_FIRST" = "STOP_FIRST"
+
+class CostModel(Model):              # "cost-model-v1", valori in pip
+    commission_pips: float = 0.35    # per lato
+    slippage_entry_pips: float = 0.1
+    slippage_stop_pips: float = 0.2  # STOP e TIME
+    slippage_target_pips: float = 0.0
+    multiplier: float = 1.0          # su commissione e slippage, mai sullo spread
+
+class Fill:                          # un esito simulato, provenance MODELLED
+    key: str                         # candidate_id, o "bench:..." per i benchmark
+    stream: "signal" | "exec" | "counterfactual" | "broker"
+    reason: STOP | STOP_GAP | TARGET | TIME | NOT_FILLED_NO_QUOTE | END_OF_DATA
+    entry_ns, entry_price, exit_ns, exit_price
+    r_gross, r_net, commission_r, spread_pips, slippage_pips
+    ambiguous, path_gap, max_missing_minutes, holding_slots, weekend_crossings, mae_r, mfe_r
+```
+
+- `R` è la distanza `|entry_ref − stop|` del candidato. È la stessa per tutti gli
+  stream.
+- **Ingresso**: avviene al primo minuto `VALID` in `[as_of + latenza,
+  expires_at)`. Un LONG entra all'`ask_open` e uno SHORT al `bid_open`, con lo
+  slippage a sfavore. Lo stream `signal` entra invece a `entry_ref`.
+- **Trigger di uscita**: un LONG esce sul BID e uno SHORT sull'ASK. Lo stream
+  `signal` usa il BID per entrambe le direzioni e non ha costi.
+- **Ordine dentro ogni minuto** (escluso il minuto di entrata):
+  1. Se l'apertura è oltre lo stop, l'esito è `STOP_GAP` al prezzo di apertura.
+  2. Se l'apertura è oltre il target, l'esito è `TARGET` al livello del target.
+  3. Altrimenti si confrontano high e low con i livelli. Se nello stesso minuto
+     sono toccati sia lo stop sia il target, decide `ambiguity`.
+- **Uscita a tempo**: al `close` dell'ultimo minuto prima della chiusura del
+  `time_exit_slots`-esimo slot H1 in sessione. Se il percorso finisce prima,
+  l'esito è `END_OF_DATA` ed è escluso dalle metriche.
+- Gli identificativi sono `outcome_id = H("SimulatedOutcome/1", key, symbol,
+  stream, exec_model_version, exec_params_hash, cost_model_hash, path_id)` e
+  `research_fingerprint = H("ResearchFingerprint/1", ...)`. Il secondo include
+  lo sha256 del file di pre-registrazione, il fingerprint e l'output hash del
+  replay, i `path_id`, gli hash di esecuzione e costi, la fine effettiva e
+  `code_version`.
+- **Parità (T11)**: il ciclo "runtime" riceve le barre una alla volta
+  all'istante `available_at` effettivo e cita lo stesso `DatasetRef`, quindi le
+  sequenze di `evaluation_hash` devono essere identiche a quelle del replay. Nel
+  runtime M3 la sorgente sarà il feed del broker, e la parità si verificherà sul
+  contenuto delle serie e della decisione.

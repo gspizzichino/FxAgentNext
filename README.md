@@ -3,10 +3,10 @@
 Piattaforma di ricerca quantitativa Forex, ricostruita da zero. Nessun trading
 reale è abilitato e in questa fase non esiste alcun codice broker.
 
-Stato: **M1 — data foundation + Strategy Engine, in attesa di approvazione.**
+Stato: **M2 — simulatore e protocollo di ricerca implementati; primo report reale in attesa dei dati storici.**
 
 - [Specifica M0](docs/M0-specifica.md) · [Contratti](docs/contracts.md) · [ADR](docs/adr/README.md)
-- [Report M1](docs/M1-report.md)
+- [Report M1](docs/M1-report.md) · [Specifica M2](docs/M2-specifica.md)
 
 ## Installazione (Windows o Linux)
 
@@ -48,3 +48,40 @@ La sorgente limita le richieste (HTTP 429/503 frequenti): il downloader attende
 `--min-interval` secondi tra una richiesta e l'altra (default 1), ritenta gli
 errori transitori e, se un giorno resta `FAILED`, basta rilanciare lo stesso
 comando: i giorni già scaricati vengono saltati.
+
+`import` scrive i dataset M15 BID e ASK in `data/datasets/` e il percorso M1
+BID/ASK per il simulatore in `data/paths/`. Stampa gli identificativi da usare
+nella pre-registrazione.
+
+## Esperimenti (M2)
+
+Ogni esperimento è una pre-registrazione TOML congelata prima di guardare i
+risultati. Gli split sono fissati nel codice: sviluppo 2015–2020, validazione
+2021–2023, holdout 2024 → ottobre 2026.
+
+```toml
+experiment_id = "baseline-donchian-v1"
+hypothesis = "Il breakout Donchian H1 congelato ha expectancy netta positiva"
+split = "validation"            # development | validation | holdout
+
+[[data]]
+symbol = "EURUSD"
+m15_bid_dataset = "<dataset_id BID stampato da import>"
+path = "<PATH stampato da import>"
+```
+
+```powershell
+uv run fxnext research prereg.toml          # replay + simulazione + benchmark + report
+uv run fxnext research prereg.toml --grid   # griglia informativa, solo sviluppo
+```
+
+- **Risultato**: per ogni esperimento il comando crea `research/<fingerprint>/`,
+  che contiene:
+  - `report.md` e `report.json` con metriche, benchmark, copertura ed esito dei
+    criteri;
+  - `outcomes.parquet` con un esito simulato per candidato e variante.
+- **Holdout**: va aperto con `split = "holdout"` e `holdout = true`. Ogni
+  apertura resta registrata in `research/holdout_log.jsonl`; per una seconda
+  apertura serve `--reopen-holdout`.
+- **Interpretazione**: tutti i rendimenti sono `MODELLED` e nessun report
+  dimostra un edge da solo.
