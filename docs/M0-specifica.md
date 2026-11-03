@@ -443,16 +443,16 @@ intendono accettate le raccomandazioni.
 | D7 | Tooling | pip/venv; uv | **uv** (lockfile, Python 3.12 gestito, funziona su Windows), ruff, mypy `--strict`, pytest, hypothesis, import-linter. |
 | D8 | CI | nessuna; GitHub Actions Linux; Linux + Windows | **GitHub Actions su Linux e Windows** (il determinismo cross-platform è un requisito). |
 | D9 | Lingua | tutto italiano; codice inglese e documenti italiani | **Codice e identificativi in inglese, documentazione e ADR in italiano.** |
-| D10 | Periodo storico (serve per M2, utile saperlo ora) | p.es. 2012–2025 | Proporre in M2 con split dev/validation/holdout prima di guardare i risultati. |
+| D10 | Periodo storico (serve per M2, utile saperlo ora) | p.es. 2012–2025 | **Decisa 2026-11-03: dal 1 gennaio 2015 a oggi**, EURUSD, GBPUSD, USDJPY, BID+ASK. Lo split dev/validation/holdout si fissa nella specifica M2 prima di guardare i risultati. |
 
 Decisioni aggiunte dalla revisione v0.1 (H1 e H5 approvate il 2026-11-03; H2, H3, H4 ancora aperte):
 
 | # | Decisione | Opzioni | Raccomandazione |
 |---|---|---|---|
 | H1 | Definizione ATR14 della baseline | media semplice di 14 TR; Wilder su finestra fissa (seed SMA + N barre di ricorsione); Wilder su tutta la storia | **Approvata 2026-11-03: media semplice.** Memoria finita di 15 slot, nessun parametro di warm-up arbitrario. Wilder su tutta la storia è escluso perché dipende dall'inizio del dataset. |
-| H2 | Barra M15 piatta a volume zero in sessione | invalida la barra derivata e la finestra; trattata come valida; esclusa dagli indicatori | **Invalida** (astensione `FLAT_BAR_IN_WINDOW`), conservativo e visibile; rivedibile con dati sulla frequenza reale per simbolo. |
-| H3 | Valori di default in replay | `publication_delay = 0 s`, `evaluation_delay = 0 s`; valori positivi | **0 s e 0 s** in M1; in M3 si fissa il valore runtime di `evaluation_delay` e lo si usa anche nei test di parità. |
-| H4 | Candidato sull'ultimo slot prima di una chiusura | `MARKET_CLOSED`; candidato valido alla riapertura | **`MARKET_CLOSED`**: nessun candidato attraversa weekend o festività. |
+| H2 | Barra M15 piatta a volume zero in sessione | invalida la barra derivata e la finestra; trattata come valida; esclusa dagli indicatori | **Approvata 2026-11-03: invalida** (astensione `FLAT_BAR_IN_WINDOW`), conservativo e visibile; rivedibile con dati sulla frequenza reale per simbolo. |
+| H3 | Valori di default in replay | `publication_delay = 0 s`, `evaluation_delay = 0 s`; valori positivi | **Approvata 2026-11-03: 0 s e 0 s** in M1; in M3 si fissa il valore runtime di `evaluation_delay` e lo si usa anche nei test di parità. |
+| H4 | Candidato sull'ultimo slot prima di una chiusura | `MARKET_CLOSED`; candidato valido alla riapertura | **Approvata 2026-11-03: `MARKET_CLOSED`**: nessun candidato attraversa weekend o festività. |
 | H5 | Ripresa con codice diverso | `code_version` nel fingerprint (ripresa solo con lo stesso commit); escluso | **Approvata 2026-11-03: incluso.** Un run ripreso con codice diverso sarebbe un run diverso. |
 
 ---
