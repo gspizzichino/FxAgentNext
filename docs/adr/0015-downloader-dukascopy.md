@@ -19,11 +19,12 @@ vecchio FxAgent usava il pacchetto `duka` invocato come processo esterno.
 - File in cache con hash nel nome, scritti con `.tmp` + `os.replace`, mai
   sovrascritti; un riscaricamento diverso è conservato accanto e segnalato
   `SOURCE_CHANGED`.
-- GET è idempotente, quindi retry con backoff esponenziale solo su timeout e
-  5xx, con limite. 200 vuoto = `EMPTY` (nessun dato), 404 = `NOT_FOUND`, corpo
+- GET è idempotente, quindi retry con backoff esponenziale solo su timeout,
+  5xx e 429 (rate limit della sorgente, osservato sui primi download reali),
+  con limite. 200 vuoto = `EMPTY` (nessun dato), 404 = `NOT_FOUND`, corpo
   non decomprimibile = `CORRUPT`; niente di questo crea barre.
-- Download sequenziale (concorrenza configurabile, default 1) per non
-  sovraccaricare la sorgente; ripresa saltando i giorni già `OK` in cache.
+- Download sequenziale (concorrenza configurabile, default 1) con pausa minima tra
+  richieste (default CLI 1 s) per non sovraccaricare la sorgente; ripresa saltando i giorni già `OK` in cache.
 - Non si scaricano giorni non ancora interamente trascorsi.
 - Aggregazione M1 → M15 e controlli di coerenza come in contracts §13.
 - I dati reali non entrano nel repository. I test usano file `.bi5` generati dai

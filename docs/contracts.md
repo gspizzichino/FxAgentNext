@@ -11,6 +11,10 @@ sono in [ADR-0002](adr/0002-modello-del-tempo.md), [0005](adr/0005-base-di-prezz
 
 ## Changelog
 
+- **v0.2.1** (2026-11-03, implementazione M1): `Timeframe.M1` per la sola sorgente;
+  `dataset_id` calcolato sugli sha256 delle colonne canoniche (equivalente alle
+  righe canoniche, indipendente dal writer Parquet); `evaluate()` costruisce da sé
+  la `EvaluationRequest` da snapshot e config (`scheduler_version` costante del motore).
 - **v0.2** (2026-11-02): sorgente Dukascopy con downloader e cache grezza (§13,
   ADR-0015). Nessun altro contratto cambia.
 - **v0.1** (2026-10-23): `available_at` e `availability` per ogni osservazione
@@ -55,6 +59,7 @@ Nessuna nuova dipendenza: `FrozenMap` è una classe di ~50 righe in `domain`.
 
 ```python
 class Timeframe(StrEnum):
+    M1 = "M1"                             # solo sorgente Dukascopy (§13), mai negli snapshot
     M15 = "M15"; H1 = "H1"; H4 = "H4"     # .duration -> timedelta
 
 class PriceBasis(StrEnum):
