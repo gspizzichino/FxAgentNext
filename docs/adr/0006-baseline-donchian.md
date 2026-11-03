@@ -24,7 +24,7 @@ Parametri e regole congelati prima di qualunque risultato e non ottimizzati.
 La v0 indicava Wilder. La ricorsione di Wilder ha memoria infinita: il valore a
 `as_of` dipende dall'inizio del dataset e dalla regola di ripartenza dopo un gap,
 e due dataset con inizio diverso darebbero valutazioni diverse per lo stesso
-istante. La media semplice ha memoria finita. Soggetta ad approvazione (decisione H1).
+istante. La media semplice ha memoria finita. Approvata da Giacomo il 2026-11-03 (decisione H1).
 
 ## Conseguenze
 - Esercita finestre, indicatori, gate dati, livelli, scadenza e astensioni.
