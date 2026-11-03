@@ -50,6 +50,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--basis", action="append", choices=["BID", "ASK"])
     p.add_argument("--from", dest="start", type=date.fromisoformat, required=True)
     p.add_argument("--to", dest="end", type=date.fromisoformat, required=True)
+    p.add_argument("--min-interval", type=float, default=1.0, help="seconds between requests")
 
     p = sub.add_parser("import", help="build M15 datasets from the raw cache")
     p.add_argument("--cache", type=Path, default=Path("data/raw/dukascopy"))
@@ -91,7 +92,16 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.cmd == "download":
         bases = [PriceBasis(b) for b in (args.basis or ["BID", "ASK"])]
-        summary = download_range(RawCache(args.cache), args.symbol, bases, args.start, args.end)
+        summary = download_range(
+            RawCache(args.cache),
+            args.symbol,
+            bases,
+            args.start,
+            args.end,
+            max_attempts=6,
+            backoff_seconds=5.0,
+            min_interval=args.min_interval,
+        )
         print(
             json.dumps(
                 summary.__dict__

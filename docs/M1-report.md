@@ -68,13 +68,18 @@ circa 12 s qui; 10 anni stimati intorno ai 2 minuti.
 
 ## 5. Limiti rimasti
 
-1. **Formato Dukascopy non verificato su un file reale.** Questo ambiente non
-   raggiunge `datafeed.dukascopy.com`. Parser ed encoder dei test condividono la
-   stessa ipotesi sul formato (ordine dei campi, divisore dei prezzi). Prima di
-   usare dati reali serve un download di prova dal tuo PC e il confronto con un
-   grafico Dukascopy di riferimento.
-2. **CI Windows non ancora eseguita**: richiede il push. Fino ad allora la parità
-   degli hash Linux/Windows (T4.6) e il lock `msvcrt` non sono verificati.
+1. **Formato Dukascopy verificato su file reali (2026-11-03).** Scaricata la
+   settimana EURUSD 14–20 gennaio 2024, BID e ASK (14 file): decodifica senza
+   errori, 1.440 minuti al giorno, 480 barre M15 in sessione, tutte VALID,
+   nessuno spread negativo, spread mediano 0,3 pip (max 3,7). Prezzi coerenti
+   col mercato di quella settimana (minimo 1,08445, chiusura venerdì 1,0896).
+   Replay H1 della settimana: 120 valutazioni. Resta da fare il confronto barra
+   per barra con un grafico Dukascopy. La sorgente limita le richieste (429 e
+   503 frequenti, circa 50 s per file in media): il downloader ora tratta 429
+   come transitorio e attende tra le richieste. Un anno BID+ASK richiede
+   quindi alcune ore; la ripresa salta i giorni già scaricati.
+2. **CI Windows verde** sulla PR #1: parità degli hash (T4.6) e lock `msvcrt`
+   verificati.
 3. Calendario v1: solo chiusure 25 dicembre e 1 gennaio. Dati reali in quei giorni
    vengono scartati come `out_of_session` (contati nel report di qualità).
 4. Un file Parquet per dataset, senza partizione per anno (sufficiente ai volumi
@@ -89,7 +94,7 @@ circa 12 s qui; 10 anni stimati intorno ai 2 minuti.
 
 ## 6. Prossimi passi proposti
 
-1. Push e CI su Windows.
-2. Download di prova di pochi giorni di EURUSD dal tuo PC e verifica del parser.
-3. Conferma di H2, H3, H4.
-4. Approvazione di M1 prima di iniziare M2 (simulatore, costi, metriche, walk-forward).
+1. Confronto a campione con un grafico Dukascopy e download dello storico
+   completo (lungo, da lanciare in background).
+2. Conferma di H2, H3, H4.
+3. Approvazione di M1 prima di iniziare M2 (simulatore, costi, metriche, walk-forward).

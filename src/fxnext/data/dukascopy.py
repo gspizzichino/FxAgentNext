@@ -61,7 +61,7 @@ def urllib_fetcher(url: str, timeout: float) -> HttpResult:
         with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
             return HttpResult(int(response.status), response.read())
     except urllib.error.HTTPError as error:
-        if error.code >= 500:
+        if error.code >= 500 or error.code == 429:  # 429: source rate limit, retry later
             raise TransientHttpError(f"HTTP {error.code}") from error
         return HttpResult(int(error.code), b"")
     except (urllib.error.URLError, TimeoutError, ConnectionError) as error:
@@ -160,6 +160,7 @@ def download_range(
     timeout: float = 30.0,
     margin: timedelta = timedelta(hours=2),
     refetch: bool = False,
+    min_interval: float = 0.0,
 ) -> DownloadSummary:
     """Download whole UTC days into the cache, skipping days already resolved."""
 
@@ -168,6 +169,7 @@ def download_range(
     )
     resolved = cache.resolved()
     current = now()
+    first_request = True
     for symbol in symbols:
         for basis in bases:
             for day in iter_days(start, end):
@@ -180,6 +182,9 @@ def download_range(
                     counts["skipped"] += 1
                     continue
                 counts["requested"] += 1
+                if not first_request and min_interval > 0:
+                    sleep(min_interval)  # be polite: the source rate-limits bursts (HTTP 429)
+                first_request = False
                 record = _fetch_day(
                     cache,
                     symbol,

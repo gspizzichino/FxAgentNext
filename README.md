@@ -44,3 +44,7 @@ uv run fxnext import --symbol EURUSD --from 2024-01-01 --to 2024-03-31
 
 Il download è l'unico comando che usa la rete e va eseguito su una macchina che
 raggiunge `datafeed.dukascopy.com`. I dati restano in `data/` (ignorata da git).
+La sorgente limita le richieste (HTTP 429/503 frequenti): il downloader attende
+`--min-interval` secondi tra una richiesta e l'altra (default 1), ritenta gli
+errori transitori e, se un giorno resta `FAILED`, basta rilanciare lo stesso
+comando: i giorni già scaricati vengono saltati.

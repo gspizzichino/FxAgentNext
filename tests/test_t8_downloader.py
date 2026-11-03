@@ -182,6 +182,28 @@ def test_t8_4_retries(server: Server, tmp_path: Path) -> None:
     from fxnext.cli import main  # noqa: F401  (exit code checked via summary.failed)
 
 
+def test_t8_4b_rate_limit_and_pacing(server: Server, tmp_path: Path) -> None:
+    """Real Dukascopy answers bursts with 429: retried like 5xx, and requests are paced."""
+
+    p = server.path("EURUSD", BID, DAYS[0])
+    server.routes[p] = [(429, b""), (200, synthetic_bi5_day(DAYS[0], seed=3))]
+    server.routes[server.path("EURUSD", BID, DAYS[1])] = [(200, synthetic_bi5_day(DAYS[1], seed=4))]
+    sleeps: list[float] = []
+    s = download_range(
+        RawCache(tmp_path / "raw"),
+        ["EURUSD"],
+        [BID],
+        DAYS[0],
+        DAYS[1],
+        base_url=server.base,
+        now=NOW,
+        sleep=sleeps.append,
+        backoff_seconds=0.5,
+        min_interval=2.0,
+    )
+    assert s.ok == 2 and server.hits[p] == 2 and sleeps == [0.5, 2.0]
+
+
 def test_t8_5_corrupt(server: Server, tmp_path: Path) -> None:
     server.routes[server.path("EURUSD", BID, DAYS[0])] = [(200, b"garbage-not-lzma")]
     good = synthetic_bi5_day(DAYS[1], seed=1)
