@@ -569,8 +569,10 @@ Ogni test è deterministico e ha un esito atteso esatto.
 
 - T2.1 Dataset OBSERVED in cui la barra di segnale arriva a `T_k + 1 s` →
   astensione `BAR_NOT_AVAILABLE`; `explain` riporta ex post `LATE_ARRIVAL`.
-  Lo stesso slot senza barra → stessa astensione, ex post `MISSING`. I due
-  `evaluation_hash` sono identici (l'informazione ex post non entra nell'hash).
+  Lo stesso slot senza barra → stessa astensione, ex post `MISSING`. Serie,
+  esito e filtri sono identici; gli `evaluation_hash` differiscono solo perché
+  lo snapshot cita `sources` (dataset_id diversi). L'informazione ex post non
+  entra mai nell'hash. *(Corretto in M1: la v0.1 diceva "hash identici".)*
 - T2.2 Esattamente una `EvaluationRequest` per ogni `C_k` in sessione
   nell'intervallo; nessuna fuori sessione; numero atteso calcolato dal calendario
   per una settimana con cambio DST USA e una con cambio DST solo europeo.
