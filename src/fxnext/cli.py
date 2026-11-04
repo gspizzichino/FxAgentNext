@@ -1,4 +1,4 @@
-"""Command line: download, import, inspect, replay run/verify, explain."""
+"""Command line: download, import, inspect, replay, research, verify, explain."""
 
 from __future__ import annotations
 
@@ -13,10 +13,12 @@ from fxnext.audit.explain import explain
 from fxnext.audit.store import AuditDestination, read_manifest
 from fxnext.data.dukascopy import RawCache, download_range
 from fxnext.data.importers import cross_check_bid_ask, import_dukascopy
+from fxnext.data.path import import_path_dukascopy, write_path
 from fxnext.data.store import load_dataset, write_dataset
 from fxnext.data.synthetic import synthetic_m15
 from fxnext.domain.enums import DatasetProvenance, PriceBasis
 from fxnext.replay.runner import run_replay
+from fxnext.research.experiment import run_experiment, run_grid
 
 
 def _dt(value: str) -> datetime:
@@ -52,9 +54,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--to", dest="end", type=date.fromisoformat, required=True)
     p.add_argument("--min-interval", type=float, default=1.0, help="seconds between requests")
 
-    p = sub.add_parser("import", help="build M15 datasets from the raw cache")
+    p = sub.add_parser("import", help="build M15 datasets and the M1 path from the raw cache")
     p.add_argument("--cache", type=Path, default=Path("data/raw/dukascopy"))
     p.add_argument("--datasets", type=Path, default=Path("data/datasets"))
+    p.add_argument("--paths", type=Path, default=Path("data/paths"))
     p.add_argument("--symbol", required=True)
     p.add_argument("--from", dest="start", type=date.fromisoformat, required=True)
     p.add_argument("--to", dest="end", type=date.fromisoformat, required=True)
@@ -78,6 +81,16 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--to", dest="end", type=_dt, required=True)
     p.add_argument("--evaluation-delay-s", type=float, default=0.0)
     p.add_argument("--publication-delay-s", type=float, default=0.0)
+    p.add_argument("--code-version", default=None)
+
+    p = sub.add_parser("research", help="run a pre-registered experiment (M2)")
+    p.add_argument("prereg", type=Path)
+    p.add_argument("--datasets", type=Path, default=Path("data/datasets"))
+    p.add_argument("--paths", type=Path, default=Path("data/paths"))
+    p.add_argument("--runs", type=Path, default=Path("runs"))
+    p.add_argument("--research", type=Path, default=Path("research"))
+    p.add_argument("--reopen-holdout", action="store_true")
+    p.add_argument("--grid", action="store_true", help="informative grid, development only")
     p.add_argument("--code-version", default=None)
 
     p = sub.add_parser("verify", help="verify a run destination")
@@ -129,6 +142,9 @@ def main(argv: list[str] | None = None) -> int:
                 source={"kind": "dukascopy", "raw_sha256": raw},
             )
             print(basis.value, ref.dataset_id)
+        path, _ = import_path_dukascopy(cache, args.symbol, args.start, args.end)
+        write_path(args.paths, path)
+        print("PATH", path.path_id)
         return 0
     if args.cmd == "synthetic":
         res = synthetic_m15(args.start, args.end, seed=args.seed)
@@ -166,6 +182,38 @@ def main(argv: list[str] | None = None) -> int:
                     "output_hash": result.output_hash,
                     "evaluations": result.evaluations,
                     "path": str(result.path),
+                },
+                indent=2,
+            )
+        )
+        return 0
+    if args.cmd == "research":
+        version = args.code_version or code_version()
+        if args.grid:
+            rows = run_grid(
+                args.prereg,
+                datasets_root=args.datasets,
+                paths_root=args.paths,
+                runs_root=args.runs,
+                code_version=version,
+            )
+            print(json.dumps(rows, indent=2))
+            return 0
+        exp = run_experiment(
+            args.prereg,
+            datasets_root=args.datasets,
+            paths_root=args.paths,
+            runs_root=args.runs,
+            research_root=args.research,
+            code_version=version,
+            reopen_holdout=args.reopen_holdout,
+        )
+        print(
+            json.dumps(
+                {
+                    "fingerprint": exp.fingerprint,
+                    "path": str(exp.path),
+                    "outcome": exp.report["criteria"]["outcome"],
                 },
                 indent=2,
             )

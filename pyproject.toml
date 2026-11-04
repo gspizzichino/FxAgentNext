@@ -61,13 +61,13 @@ include_external_packages = true
 name = "Core puro: domain non importa altri moduli fxnext"
 type = "forbidden"
 source_modules = ["fxnext.domain"]
-forbidden_modules = ["fxnext.strategy", "fxnext.data", "fxnext.replay", "fxnext.audit", "fxnext.cli"]
+forbidden_modules = ["fxnext.strategy", "fxnext.data", "fxnext.replay", "fxnext.audit", "fxnext.research", "fxnext.cli"]
 
 [[tool.importlinter.contracts]]
 name = "Core puro: strategy dipende solo da domain"
 type = "forbidden"
 source_modules = ["fxnext.strategy"]
-forbidden_modules = ["fxnext.data", "fxnext.replay", "fxnext.audit", "fxnext.cli"]
+forbidden_modules = ["fxnext.data", "fxnext.replay", "fxnext.audit", "fxnext.research", "fxnext.cli"]
 
 [[tool.importlinter.contracts]]
 name = "Core puro: niente I/O, rete, storage nel core"
@@ -75,3 +75,9 @@ type = "forbidden"
 source_modules = ["fxnext.domain", "fxnext.strategy"]
 forbidden_modules = ["pyarrow", "duckdb", "urllib", "http", "socket", "sqlite3", "subprocess", "random", "time", "lzma"]
 allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Il simulatore (che vede il futuro) non e' importato da dati, replay o audit"
+type = "forbidden"
+source_modules = ["fxnext.data", "fxnext.replay", "fxnext.audit"]
+forbidden_modules = ["fxnext.research"]

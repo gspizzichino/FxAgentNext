@@ -8,13 +8,14 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import numpy.typing as npt
 
 from fxnext.audit.store import AuditDestination, CrashHook
 from fxnext.data.snapshot import SnapshotBuilder
 from fxnext.data.store import Dataset
 from fxnext.domain.calendar import CALENDAR_VERSION, FxCalendar
 from fxnext.domain.contracts import EMPTY_STATE, StrategyConfig
-from fxnext.domain.enums import Dispatch
+from fxnext.domain.enums import Dispatch, Timeframe
 from fxnext.domain.hashing import HASH_SCHEMA, content_hash
 from fxnext.domain.timeutil import from_ns, to_ns
 from fxnext.strategy.base import ENGINE_VERSION, SCHEDULER_VERSION
@@ -77,6 +78,42 @@ def fingerprint_inputs(
     }
 
 
+Schedule = list[tuple[int, str, int]]  # (as_of_ns, symbol, grid index)
+
+
+def build_schedule(
+    tf: Timeframe,
+    start: datetime,
+    end: datetime,
+    evaluation_delay_ns: int,
+    symbols: list[str],
+    slots_back: int,
+) -> tuple[npt.NDArray[np.int64], Schedule]:
+    """Calendar-driven schedule shared by replay and the runtime-like loop (T11)."""
+
+    grid = FxCalendar().slot_grid(tf, start - timedelta(days=60), end + timedelta(days=14))
+    first = int(np.searchsorted(grid, to_ns(start)))
+    if first < slots_back:
+        raise ReplayInputError("calendar padding too small")
+    schedule: Schedule = []
+    end_ns = to_ns(end)
+    for idx in range(first, grid.size):
+        if int(grid[idx]) + tf.ns > end_ns:
+            break
+        for symbol in symbols:
+            schedule.append((int(grid[idx]) + tf.ns + evaluation_delay_ns, symbol, idx))
+    schedule.sort()
+    return grid, schedule
+
+
+def window_and_next(
+    grid: npt.NDArray[np.int64], idx: int, slots_back: int, tf: Timeframe
+) -> tuple[npt.NDArray[np.int64], int | None]:
+    close_ns = int(grid[idx]) + tf.ns
+    nxt = int(grid[idx + 1]) if idx + 1 < grid.size and int(grid[idx + 1]) == close_ns else None
+    return grid[idx - slots_back : idx + 1], nxt
+
+
 def run_replay(
     datasets: list[Dataset],
     runs_root: Path,
@@ -101,22 +138,11 @@ def run_replay(
         datasets, config, start, end, evaluation_delay, publication_delay, code_version
     )
     fingerprint = content_hash("RunFingerprint/1", inputs)
-    calendar = FxCalendar()
     tf = req.timeframe
-    delay_ns = inputs["evaluation_delay_ns"]
-    grid = calendar.slot_grid(tf, start - timedelta(days=60), end + timedelta(days=14))
-    first = int(np.searchsorted(grid, to_ns(start)))
-    if first < req.slots_back:
-        raise ReplayInputError("calendar padding too small")
     builders = {d.ref.symbol: SnapshotBuilder(d, inputs["publication_delay_ns"]) for d in datasets}
-    schedule: list[tuple[int, str, int]] = []  # (as_of_ns, symbol, grid index)
-    end_ns = to_ns(end)
-    for idx in range(first, grid.size):
-        if int(grid[idx]) + tf.ns > end_ns:
-            break
-        for symbol in sorted(builders):
-            schedule.append((int(grid[idx]) + tf.ns + delay_ns, symbol, idx))
-    schedule.sort()
+    grid, schedule = build_schedule(
+        tf, start, end, inputs["evaluation_delay_ns"], sorted(builders), req.slots_back
+    )
 
     dest = AuditDestination(Path(runs_root), fingerprint, inputs, crash_hook=crash_hook)
     with dest:
@@ -137,13 +163,7 @@ def run_replay(
             if current_month is not None and month != current_month:
                 dest.commit_segment()
             current_month = month
-            window = grid[idx - req.slots_back : idx + 1]
-            close_ns = int(grid[idx]) + tf.ns
-            nxt = (
-                int(grid[idx + 1])
-                if idx + 1 < grid.size and int(grid[idx + 1]) == close_ns
-                else None
-            )
+            window, nxt = window_and_next(grid, idx, req.slots_back, tf)
             snapshot = builders[symbol].build(tf, window, nxt, as_of_ns)
             evaluation = strategy.evaluate(snapshot, config, EMPTY_STATE)
             dest.append(evaluation)
