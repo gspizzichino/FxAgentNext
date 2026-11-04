@@ -310,3 +310,19 @@ def test_t8_10_import_is_deterministic(server: Server, tmp_path: Path) -> None:
 
 REGRESSION_DATASET_ID = "7858831f1674b3ddf7ac3b93d7224e633c71a8ae0af0d783f362479b1c1a7425"
 _ = timedelta, FetchStatus
+
+
+def test_t8_progress_callback(server: Server, tmp_path: Path) -> None:
+    server.routes[server.path("EURUSD", BID, DAYS[0])] = [(200, synthetic_bi5_day(DAYS[0], seed=3))]
+    seen: list[str] = []
+    download_range(
+        RawCache(tmp_path / "raw"),
+        ["EURUSD"],
+        [BID],
+        DAYS[0],
+        DAYS[1],
+        base_url=server.base,
+        now=NOW,
+        progress=lambda rec: seen.append(f"{rec['day']} {rec['status']}"),
+    )
+    assert seen == [f"{DAYS[0].isoformat()} OK", f"{DAYS[1].isoformat()} NOT_FOUND"]

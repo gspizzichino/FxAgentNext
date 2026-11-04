@@ -8,6 +8,7 @@ import subprocess
 import sys
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 from fxnext.audit.explain import explain
 from fxnext.audit.store import AuditDestination, read_manifest
@@ -40,6 +41,16 @@ def code_version() -> str:
     except (OSError, subprocess.CalledProcessError):
         return "unknown-dirty"
     return f"{sha}-dirty" if dirty else sha
+
+
+def _print_progress(record: dict[str, Any]) -> None:
+    detail = f" ({record['detail']})" if record.get("detail") else ""
+    print(
+        f"{record['symbol']} {record['basis']} {record['day']} {record['status']} "
+        f"tentativi={record['attempts']}{detail}",
+        file=sys.stderr,
+        flush=True,
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -114,6 +125,7 @@ def main(argv: list[str] | None = None) -> int:
             max_attempts=6,
             backoff_seconds=5.0,
             min_interval=args.min_interval,
+            progress=_print_progress,
         )
         print(
             json.dumps(
