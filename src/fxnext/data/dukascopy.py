@@ -161,6 +161,7 @@ def download_range(
     margin: timedelta = timedelta(hours=2),
     refetch: bool = False,
     min_interval: float = 0.0,
+    progress: Callable[[dict[str, Any]], None] | None = None,
 ) -> DownloadSummary:
     """Download whole UTC days into the cache, skipping days already resolved."""
 
@@ -206,6 +207,8 @@ def download_range(
                 ):
                     record = {**record, "status": FetchStatus.SOURCE_CHANGED}
                 cache.append(record)
+                if progress is not None:
+                    progress(record)
                 status = record["status"]
                 counts[
                     {
