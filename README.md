@@ -73,7 +73,12 @@ path = "<PATH stampato da import>"
 ```powershell
 uv run fxnext research prereg.toml          # replay + simulazione + benchmark + report
 uv run fxnext research prereg.toml --grid   # griglia informativa, solo sviluppo
+uv run fxnext research-summary research/<fp1> research/<fp2> --out research/summary-dev
 ```
+
+- **Confini**: ogni esperimento usa solo prezzi del proprio split; i trade
+  ancora aperti alla fine sono `END_OF_DATA` ed esclusi. Per validazione e
+  holdout importa i dati partendo un mese prima dello split (warm-up).
 
 - **Risultato**: per ogni esperimento il comando crea `research/<fingerprint>/`,
   che contiene:

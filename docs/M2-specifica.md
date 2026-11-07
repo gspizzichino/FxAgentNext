@@ -392,3 +392,42 @@ Nessuna di queste cambia una decisione approvata.
   sono esclusi dalle metriche e contati nella copertura.
 - I **minuti senza tick** (piatti, volume zero) valgono per le uscite ma non per
   l'entrata.
+
+## 15. Confini degli split e riconciliazione (2026-11-07)
+
+Verifica chiesta prima della validazione. Nessuna regola di strategia,
+esecuzione, costo o criterio cambia.
+
+- **Appartenenza**: un candidato appartiene allo split del suo `available_at`,
+  in `[inizio, fine]`. Le valutazioni sono quelle con chiusura dello slot entro
+  la fine dello split.
+- **Prezzi delle uscite**: un esperimento risolve entrata e uscita solo con
+  minuti del proprio split. Prima di simulare, il percorso M1 viene tagliato alla
+  fine effettiva (`truncate_path`). Un trade ancora aperto alla fine diventa
+  `END_OF_DATA`: è escluso dalle metriche e contato nella copertura. Così un
+  trade di fine 2023 non legge mai prezzi dell'holdout, anche se il percorso
+  importato va oltre. Se il percorso finisce già alla fine dello split, il taglio
+  non cambia nulla (stesso `path_id`).
+- **Warm-up**: il dataset M15 può (e per validazione e holdout deve) partire
+  prima dello split, così gli indicatori hanno storia dal primo giorno. Le
+  valutazioni e i candidati partono comunque dall'inizio dello split.
+- **Riconciliazione**: per ogni simbolo, nello stream `exec ×1`,
+  eseguiti + counterfactual + non entrati = candidati, e lo stream `signal` ha
+  esattamente un esito per candidato. Nessuna entrata o uscita cade fuori dallo
+  split. Se un controllo non torna, l'esperimento si ferma con `ProtocolError` e
+  non scrive il report. Il report ha la sezione `reconciliation`.
+- **Riepilogo tra simboli** (`fxnext research-summary`): legge senza modificarli
+  i risultati di più esperimenti con la stessa baseline, lo stesso split e gli
+  stessi modelli di esecuzione e costo. Affianca i numeri per simbolo e aggiunge
+  una vista aggregata che separa i trade sovrapposti nel tempo su cambi diversi
+  (gruppi, massimo di posizioni aperte, esposizione al dollaro). La somma degli R
+  è descrittiva: non è un portafoglio e non implica un sizing validato.
+
+Verifica su `eurusd-dev-001` (dati reali, codice `4bc112e`, sola lettura):
+2.648 candidati = 1.658 eseguiti + 990 counterfactual + 0 non entrati, chiavi
+uniche per stream e variante, nessuna entrata o uscita dal 2021-01-01 in poi.
+I due `END_OF_DATA` (31/12/2020, 16:00 e 19:00) sono i trade aperti alla fine
+dello split. Il dataset e il percorso finiscono entrambi al 2021-01-01, quindi
+il taglio non cambia nulla per questo esperimento. Nel 2015 il warm-up dà 21
+valutazioni `INSUFFICIENT_HISTORY`, tutte nei primi giorni, perché prima del
+2015 non ci sono dati.
