@@ -146,6 +146,29 @@ def build_path(
     )
 
 
+def truncate_path(path: PricePath, end_ns: int) -> PricePath:
+    """View of ``path`` limited to minutes before ``end_ns`` (M2 spec §14, split boundary).
+
+    Exits of an experiment are resolved only with prices of its own split: a trade
+    still open when the split ends becomes ``END_OF_DATA``. Returns ``path`` itself
+    when it already ends by ``end_ns``; otherwise a new, content-addressed path.
+    """
+
+    if path.coverage_end_ns <= end_ns:
+        return path
+    keep = path.columns["t_ns"] < end_ns
+    quality = dict(path.quality)
+    quality["truncated_from"] = 1
+    return build_path(
+        path.symbol,
+        path.provenance,
+        from_ns(path.coverage_start_ns),
+        from_ns(max(end_ns, path.coverage_start_ns)),
+        {k: path.columns[k][keep] for k in PATH_COLUMNS},
+        quality,
+    )
+
+
 def write_path(root: Path, path: PricePath) -> str:
     final = Path(root) / path.path_id
     if final.exists():

@@ -86,6 +86,24 @@ def render_markdown(report: dict[str, Any]) -> str:
             f"esiti {c['exec_reasons']}, ambigui {c['ambiguous']}, con buchi {c['path_gap']}, "
             f"non eseguiti {c['not_filled']}, fine dati {c['end_of_data']}"
         )
+    rec = report.get("reconciliation") or {}
+    if rec:
+        lines += [
+            "",
+            "## Riconciliazione candidati ed esiti (exec ×1)",
+            "",
+            "| Simbolo | Candidati | Eseguiti | di cui fine dati | Counterfactual | Non entrati | "
+            "Scadono oltre fine split | Entrate/uscite fuori split | Bilanciato |",
+            "|---|---|---|---|---|---|---|---|---|",
+        ]
+        for sym, r in rec.items():
+            outside = r["entries_outside_split"] + r["exits_outside_split"]
+            lines.append(
+                f"| {sym} | {r['candidates']} | {r['exec_executed']} | {r['exec_end_of_data']} | "
+                f"{r['exec_counterfactual']} | {r['exec_not_entered']} | "
+                f"{r['candidates_expiring_after_end']} | {outside} | "
+                f"{'sì' if r['balanced'] else 'no'} |"
+            )
     crit = report["criteria"]
     lines += ["", "## Esito secondo i criteri pre-registrati", "", f"**{crit['outcome']}**", ""]
     for k, v in crit.get("checks", {}).items():

@@ -104,6 +104,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--grid", action="store_true", help="informative grid, development only")
     p.add_argument("--code-version", default=None)
 
+    p = sub.add_parser(
+        "research-summary", help="side-by-side and pooled summary of experiments (M2)"
+    )
+    p.add_argument("results", type=Path, nargs="+", help="research/<fingerprint> directories")
+    p.add_argument("--out", type=Path, required=True)
+
     p = sub.add_parser("verify", help="verify a run destination")
     p.add_argument("run_dir", type=Path)
 
@@ -230,6 +236,12 @@ def main(argv: list[str] | None = None) -> int:
                 indent=2,
             )
         )
+        return 0
+    if args.cmd == "research-summary":
+        from fxnext.research.aggregate import write_summary
+
+        agg = write_summary(args.results, args.out)
+        print(json.dumps({"out": str(args.out), "pooled": agg["pooled"]["exec_x1"]}, indent=2))
         return 0
     if args.cmd == "verify":
         manifest = read_manifest(args.run_dir)

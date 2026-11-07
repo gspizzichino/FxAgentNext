@@ -24,7 +24,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from fxnext.audit.store import iter_rows
-from fxnext.data.path import PricePath, load_path
+from fxnext.data.path import PricePath, load_path, truncate_path
 from fxnext.data.store import Dataset, load_dataset
 from fxnext.domain.enums import DatasetProvenance, Direction, PriceBasis, Timeframe
 from fxnext.domain.hashing import content_hash
@@ -241,6 +241,70 @@ def evaluate_criteria(
     return {"outcome": outcome, "checks": checks}
 
 
+def reconcile(
+    cands: list[TradeSpec],
+    signal: list[Fill],
+    exec_all: list[Fill],
+    executed: list[Fill],
+    blocked: list[Fill],
+    start_ns: int,
+    end_ns: int,
+) -> dict[str, Any]:
+    """Every candidate has exactly one fate per stream, and nothing crosses the split.
+
+    exec ×1: executed + counterfactual + not entered == candidates (M2 spec §14).
+    Raises ``ProtocolError`` on any mismatch: a report that does not add up is not written.
+    """
+
+    keys = [c.key for c in cands]
+    ex_keys = {f.key for f in executed}
+    cf_keys = {f.key for f in blocked}
+    not_entered = [f for f in exec_all if f.entry_ns is None]
+    every = signal + exec_all
+    out: dict[str, Any] = {
+        "candidates": len(cands),
+        "unique_keys": len(set(keys)),
+        "signal_fills": len(signal),
+        "signal_counted": sum(f.counted for f in signal),
+        "signal_reasons": dict(sorted(Counter(f.reason.value for f in signal).items())),
+        "exec_executed": len(executed),
+        "exec_executed_counted": sum(f.counted for f in executed),
+        "exec_counterfactual": len(blocked),
+        "exec_not_entered": len(not_entered),
+        "exec_end_of_data": sum(f.reason is ExitReason.END_OF_DATA for f in executed),
+        "candidates_available_before_start": sum(c.available_at_ns < start_ns for c in cands),
+        "candidates_available_after_end": sum(c.available_at_ns > end_ns for c in cands),
+        "candidates_expiring_after_end": sum(c.expires_at_ns > end_ns for c in cands),
+        "entries_outside_split": sum(
+            f.entry_ns is not None and not start_ns <= f.entry_ns < end_ns for f in every
+        ),
+        "exits_outside_split": sum(
+            f.exit_ns is not None and not start_ns <= f.exit_ns < end_ns for f in every
+        ),
+    }
+    problems = []
+    if out["unique_keys"] != len(cands):
+        problems.append("duplicate candidate keys")
+    if [f.key for f in signal] != keys or [f.key for f in exec_all] != keys:
+        problems.append("streams do not cover the candidates one to one")
+    if ex_keys & cf_keys:
+        problems.append("a candidate is both executed and counterfactual")
+    if len(executed) + len(blocked) + len(not_entered) != len(cands):
+        problems.append("executed + counterfactual + not entered != candidates")
+    for k in (
+        "candidates_available_before_start",
+        "candidates_available_after_end",
+        "entries_outside_split",
+        "exits_outside_split",
+    ):
+        if out[k]:
+            problems.append(k)
+    out["balanced"] = not problems
+    if problems:
+        raise ProtocolError("reconciliation failed: " + "; ".join(problems))
+    return out
+
+
 @dataclass(frozen=True, slots=True)
 class ExperimentResult:
     fingerprint: str
@@ -289,6 +353,9 @@ def run_experiment(
     if end <= start:
         raise ProtocolError("data does not cover the split")
     provenance = datasets[0].ref.provenance
+    # Exits are resolved only with prices of this split (M2 spec §14, split boundary).
+    source_paths = {s: p.path_id for s, p in sorted(paths.items())}
+    paths = {s: truncate_path(p, to_ns(end)) for s, p in paths.items()}
 
     exec_hash = content_hash("ExecParams/1", prereg.execution)
     cost_hash = content_hash("CostModel/1", prereg.costs)
@@ -328,6 +395,7 @@ def run_experiment(
     cand_pairs: list[tuple[Fill, Fill]] = []
     entries_per_month: Counter[int] = Counter()
     coverage: dict[str, Any] = {}
+    reconciliation: dict[str, Any] = {}
     target_first = prereg.execution.model_copy(update={"ambiguity": "TARGET_FIRST"})
 
     for symbol in sorted(paths):
@@ -343,6 +411,8 @@ def run_experiment(
                 for c in cands
             ]
             executed, blocked = apply_position_policy(fills)
+            if m == 1.0:
+                base_all, base_blocked = fills, [fills[i] for i in blocked]
             sym_exec[m] = [fills[i] for i in executed]
             exec_by_mult[m].extend(sym_exec[m])
             if m == 1.0:
@@ -394,6 +464,11 @@ def run_experiment(
                 )
             )
         base_fills = sym_exec[1.0] if 1.0 in sym_exec else next(iter(sym_exec.values()))
+        if 1.0 not in sym_exec:
+            raise ProtocolError("cost_multipliers must include 1.0")
+        reconciliation[symbol] = reconcile(
+            cands, signal, base_all, base_fills, base_blocked, to_ns(start), to_ns(end)
+        )
         per_symbol[symbol] = {
             "exec_x1": _summary(base_fills, months, prereg).as_dict(),
             "signal": _summary(signal, months, prereg).as_dict(),
@@ -408,6 +483,7 @@ def run_experiment(
             "candidates": len(cands),
             "exec_reasons": dict(sorted(Counter(f.reason.value for f in base_fills).items())),
             "not_filled": sum(f.reason is ExitReason.NOT_FILLED_NO_QUOTE for f in signal),
+            "exec_not_entered": sum(f.entry_ns is None for f in base_all),
             "end_of_data": sum(f.reason is ExitReason.END_OF_DATA for f in base_fills),
             "ambiguous": sum(f.ambiguous for f in base_fills),
             "path_gap": sum(f.path_gap for f in base_fills),
@@ -451,6 +527,11 @@ def run_experiment(
         "interval": {"start": start.isoformat(), "end": end.isoformat()},
         "provenance": provenance.value,
         "prereg_sha256": prereg_sha,
+        "strategy": {
+            "strategy_id": config.strategy_id,
+            "strategy_version": config.strategy_version,
+            "params": params.model_dump(mode="json"),
+        },
         "versions": {
             "research": RESEARCH_VERSION,
             "protocol": PROTOCOL_VERSION,
@@ -463,6 +544,7 @@ def run_experiment(
             "output_hash": replay.output_hash,
             "datasets": sorted(d.ref.dataset_id for d in datasets),
             "paths": {s: p.path_id for s, p in sorted(paths.items())},
+            "source_paths": source_paths,
             "exec_params": prereg.execution.model_dump(mode="json"),
             "costs": prereg.costs.model_dump(mode="json"),
         },
@@ -479,6 +561,7 @@ def run_experiment(
         "per_symbol": per_symbol,
         "benchmarks": benchmarks,
         "coverage": coverage,
+        "reconciliation": reconciliation,
         "criteria": criteria,
         "warnings": _warnings(provenance, paths, end, split_bounds(prereg.split)[1]),
     }
