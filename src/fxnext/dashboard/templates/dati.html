@@ -1,10 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Dati · FxAgent Next<div class="panel"><div class="ph"><h2>Archivio news e sentiment</h2><span class="muted">uno snapshot salvato solo quando cambia qualcosa</span></div>
-<div class="tw"><table><thead><tr><th>Fonte</th><th>Record</th><th>Giorni</th><th>Ultimo salvataggio (UTC)</th><th>Esito</th></tr></thead><tbody>
-{% for n in news %}<tr><td>{{ {"calendar": "Calendario economico", "cot": "COT CFTC", "sentiment": "Sentiment retail"}[n.source] }}</td><td>{{ n.records|int }}</td><td>{{ n.days|int }}</td><td>{{ n.last_received[:16].replace("T", " ") or "–" }}</td>
-<td>{% if not n.records %}<span class="pill p-na">Mai eseguito</span>{% elif n.last_status == 200 %}<span class="pill p-ok">OK</span>{% else %}<span class="pill p-bad">HTTP {{ n.last_status }}</span>{% endif %}</td></tr>{% endfor %}
-</tbody></table></div><p class="note">Si riempie con <code>uv run fxnext news-archive</code>, lanciato in automatico ogni 30 minuti.</p></div>
-{% endblock %}
+{% block title %}Dati · FxAgent Next{% endblock %}
 {% block body %}
 <div class="head"><span class="crumb">Sistema · <span id="refreshed">si aggiorna ogni {{ refresh }} secondi</span></span><h1>Copertura dei dati storici</h1>
 <p class="muted">Giorni scaricati per coppia, lato e anno, letti dai registri del downloader. Questa pagina non avvia download.{% if cov.latest_fetch %} Ultimo file scaricato: {{ cov.latest_fetch[:16].replace("T", " ") }} UTC.{% endif %}</p></div>

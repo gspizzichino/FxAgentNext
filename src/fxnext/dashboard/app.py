@@ -20,6 +20,7 @@ from fastapi.templating import Jinja2Templates
 
 from fxnext.dashboard import charts
 from fxnext.dashboard import readers as rd
+from fxnext.dashboard.news_view import news_page
 from fxnext.dashboard.telegram import TelegramConfig
 from fxnext.news.archive import archive_status
 from fxnext.research.protocol import SPLITS
@@ -35,6 +36,7 @@ NAV = [
             ("posizioni", "Posizioni", "M3"),
             ("segnali", "Segnali e decisioni", "M3"),
             ("proposte", "Proposte AI", "M4"),
+            ("news", "News e sentiment", ""),
         ],
     ),
     (
@@ -98,12 +100,18 @@ def _num(v: Any, digits: int = 2) -> str:
     return f"{v:.{digits}f}".replace(".", ",")
 
 
+def _whole(v: Any, signed: bool = False) -> str:
+    if not isinstance(v, int | float):
+        return "–"
+    return f"{v:{'+' if signed else ''},.0f}".replace(",", ".")
+
+
 def create_app(sources: rd.Sources, *, today: date | None = None) -> FastAPI:
     app = FastAPI(title="FxAgent Next", docs_url=None, redoc_url=None, openapi_url=None)
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
     templates = Jinja2Templates(directory=HERE / "templates")
     env = templates.env
-    env.filters.update(r=charts.fmt_r, ci=_fmt_ci, cls=_cls, int=_fmt_int, num=_num)
+    env.filters.update(r=charts.fmt_r, ci=_fmt_ci, cls=_cls, int=_fmt_int, num=_num, whole=_whole)
     env.globals.update(nav=NAV)
 
     def render(request: Request, name: str, page: str, **ctx: Any) -> HTMLResponse:
@@ -279,6 +287,12 @@ def create_app(sources: rd.Sources, *, today: date | None = None) -> FastAPI:
             datasets=rd.list_datasets(sources.datasets),
             refresh=REFRESH_SECONDS,
             news=archive_status(sources.news),
+        )
+
+    @app.get("/news", response_class=HTMLResponse)
+    def news(request: Request) -> HTMLResponse:
+        return render(
+            request, "news.html", "news", news=news_page(sources.news), refresh=REFRESH_SECONDS
         )
 
     @app.get("/sistema", response_class=HTMLResponse)

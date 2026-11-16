@@ -164,6 +164,7 @@ PAGES = [
     "/posizioni",
     "/segnali",
     "/proposte",
+    "/news",
 ]
 
 

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}News e sentiment · FxAgent Next{% endblock %}
+{% block body %}
+{% set cal, c, s = news.calendar, news.cot, news.sentiment %}
+<div class="head"><span class="crumb">Ogni giorno · <span id="refreshed">si aggiorna ogni {{ refresh }} secondi</span></span><h1>News e sentiment</h1>
+<p class="muted">Calendario economico, posizionamento dei fondi (COT) e sentiment dei trader retail, letti dall'archivio sul PC. Orari in ora italiana.</p></div>
+<p class="note">Solo da guardare: nessuno di questi dati entra nelle decisioni del sistema finché un esperimento pre-registrato non dimostra che serve (ADR-0008).</p>
+
+<div class="grid2">
+<div class="panel"><div class="ph"><h2>Sentiment retail</h2><span class="muted">Myfxbook{% if s.received %} · {{ s.received }}{% endif %}</span></div>
+{% if s.rows %}<div class="senti">
+{% for r in s.rows %}<div class="srow"><b>{{ r.symbol }}</b>
+<div class="sbar" role="img" aria-label="{{ r.long|num(0) }}% long, {{ r.short|num(0) }}% short"><span class="sl" style="width:{{ r.long or 0 }}%">{{ r.long|num(0) }}% long</span><span class="ss">{{ r.short|num(0) }}% short</span></div>
+<span class="muted num">{% if r.change is not none %}{{ r.change|whole(true) }} in 24h{% else %}–{% endif %}</span></div>{% endfor %}
+</div><p class="note">Quota dei conti retail Myfxbook lunghi o corti sulla coppia. La variazione è in punti rispetto a circa 24 ore prima.</p>
+{% else %}<p class="muted">Ancora nessun dato. Serve l'account Myfxbook nelle variabili <code>FXNEXT_MYFXBOOK_EMAIL</code> e <code>FXNEXT_MYFXBOOK_PASSWORD</code>.</p>{% endif %}</div>
+
+<div class="panel"><div class="ph"><h2>COT: posizioni nette</h2><span class="muted">CFTC{% if c.received %} · {{ c.received }}{% endif %}</span></div>
+{% if c.rows %}<div class="tw"><table><thead><tr><th>Valuta</th><th>Settimana</th><th>Fondi speculativi</th><th>Var.</th><th>% OI</th><th>Asset manager</th><th>Var.</th></tr></thead><tbody>
+{% for r in c.rows %}<tr><td><b>{{ r.currency }}</b></td><td class="num">{{ r.week }}</td>
+<td class="num {{ r.lev|cls }}">{{ r.lev|whole }}</td><td class="num {{ r.lev_change|cls }}">{{ r.lev_change|whole(true) }}</td>
+<td class="num">{{ r.lev_pct|num(1) }}</td>
+<td class="num {{ r.am|cls }}">{{ r.am|whole }}</td><td class="num {{ r.am_change|cls }}">{{ r.am_change|whole(true) }}</td></tr>{% endfor %}
+</tbody></table></div>
+<p class="note">Contratti netti (lunghi meno corti) sui futures CME della valuta contro dollaro. Le posizioni sono quelle del martedì e escono il venerdì alle 21:30 ora italiana.</p>
+{% else %}<p class="muted">Ancora nessun dato COT nell'archivio.</p>{% endif %}</div>
+</div>
+
+<div class="panel"><div class="ph"><h2>Calendario della settimana</h2><span class="muted">USD, EUR, GBP, JPY · Forex Factory{% if cal.received %} · {{ cal.received }}{% endif %}</span></div>
+{% if cal.next_high %}<p><span class="pill p-bad">Prossimo ad alto impatto</span> {{ cal.next_high.day }} {{ cal.next_high.time }} · <b>{{ cal.next_high.currency }}</b> {{ cal.next_high.title }}</p>{% endif %}
+{% if cal.days %}<div class="tw"><table class="cal"><thead><tr><th>Ora</th><th>Valuta</th><th>Impatto</th><th>Evento</th><th>Previsione</th><th>Precedente</th></tr></thead><tbody>
+{% for day, rows in cal.days %}<tr class="day"><td colspan="6">{{ day }}</td></tr>
+{% for e in rows %}<tr class="{% if e.past %}past{% endif %}"><td class="num">{{ e.time }}</td><td><b>{{ e.currency }}</b></td>
+<td>{% if e.impact == "High" %}<span class="pill p-bad">Alto</span>{% elif e.impact == "Medium" %}<span class="pill p-wait">Medio</span>{% elif e.impact == "Low" %}<span class="pill p-na">Basso</span>{% else %}<span class="pill p-na">{{ e.impact or "–" }}</span>{% endif %}</td>
+<td>{{ e.title }}</td><td class="num">{{ e.forecast }}</td><td class="num">{{ e.previous }}</td></tr>{% endfor %}{% endfor %}
+</tbody></table></div>
+<p class="note">Il feed gratuito dà previsione e dato precedente, non il valore uscito: quello si ricava in M4 dagli archivi storici. Gli eventi già passati sono in grigio.</p>
+{% else %}<p class="muted">Ancora nessun calendario nell'archivio. Si riempie con <code>uv run fxnext news-archive</code>.</p>{% endif %}</div>
+{% endblock %}
