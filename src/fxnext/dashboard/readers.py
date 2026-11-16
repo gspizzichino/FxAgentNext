@@ -32,6 +32,7 @@ class Sources:
     datasets: Path = Path("data/datasets")
     raw: tuple[Path, ...] = (Path("data/raw"),)
     frozen: tuple[Path, ...] = ()
+    news: Path = Path("data/news")
 
 
 def _read_json(path: Path) -> dict[str, Any]:

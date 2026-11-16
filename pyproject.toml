@@ -113,3 +113,9 @@ name = "Nessun modulo del motore dipende dalla app web"
 type = "forbidden"
 source_modules = ["fxnext.domain", "fxnext.strategy", "fxnext.data", "fxnext.replay", "fxnext.audit", "fxnext.research"]
 forbidden_modules = ["fxnext.dashboard", "fastapi", "starlette", "jinja2", "uvicorn"]
+
+[[tool.importlinter.contracts]]
+name = "Motore e ricerca non usano l'archivio news (entra solo con una pre-registrazione, ADR-0008)"
+type = "forbidden"
+source_modules = ["fxnext.domain", "fxnext.strategy", "fxnext.data", "fxnext.replay", "fxnext.audit", "fxnext.research"]
+forbidden_modules = ["fxnext.news"]

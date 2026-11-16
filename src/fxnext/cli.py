@@ -129,6 +129,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--datasets", type=Path, default=Path("data/datasets"))
     p.add_argument("--raw", type=Path, action="append", help="raw caches; default: data/raw")
     p.add_argument("--frozen", type=Path, action="append", help="folders with frozen documents")
+    p.add_argument("--news", type=Path, default=Path("data/news"), help="news archive folder")
+
+    p = sub.add_parser(
+        "news-archive", help="save one snapshot of calendar, COT and retail sentiment"
+    )
+    p.add_argument("--out", type=Path, default=Path("data/news"))
+    p.add_argument("--source", action="append", choices=["calendar", "cot", "sentiment"])
 
     p = sub.add_parser("notify-test", help="send a Telegram test message")
     p.add_argument("--text", default="FxAgent Next: messaggio di prova. Gli avvisi arrivano qui.")
@@ -272,6 +279,13 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.cmd == "dashboard":
         return _dashboard(args)
+    if args.cmd == "news-archive":
+        from fxnext.news.archive import SOURCES, archive_once
+
+        outcomes = archive_once(args.out, tuple(args.source or SOURCES))
+        for name, outcome in outcomes.items():
+            print(f"{name}: {outcome}")
+        return 1 if any(v.startswith("error") for v in outcomes.values()) else 0
     if args.cmd == "notify-test":
         from fxnext.dashboard.telegram import (
             CHAT_ENV,
@@ -313,6 +327,7 @@ def _dashboard(args: argparse.Namespace) -> int:
         datasets=args.datasets,
         raw=tuple(args.raw or [Path("data/raw")]),
         frozen=tuple(args.frozen or []),
+        news=args.news,
     )
     print(f"FxAgent Next su http://{args.host}:{args.port}  (Ctrl+C per fermare)")
     uvicorn.run(create_app(sources), host=args.host, port=args.port, log_level="warning")

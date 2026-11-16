@@ -109,3 +109,21 @@ Dal telefono: installa Tailscale su PC e telefono e avvia con
 
 Avvisi Telegram: crea un bot con @BotFather, imposta `FXNEXT_TELEGRAM_TOKEN` e
 `FXNEXT_TELEGRAM_CHAT_ID` sul PC e prova con `uv run fxnext notify-test`.
+
+## Archivio news e sentiment (preparazione M4)
+
+```bash
+uv run fxnext news-archive --out data/news   # uno snapshot di calendario, COT e sentiment retail
+```
+
+Ogni esecuzione aggiunge la risposta grezza di ciascuna fonte, con l'ora UTC di
+ricezione, a `data/news/<fonte>/<anno>/<giorno>.jsonl`; non riscrive mai nulla e
+salta i record identici al precedente. Fonti: calendario settimanale Forex
+Factory (feed pubblico non ufficiale), COT CFTC (Traders in Financial Futures per
+EUR, GBP, JPY), Myfxbook Community Outlook. Il sentiment richiede
+`FXNEXT_MYFXBOOK_EMAIL` e `FXNEXT_MYFXBOOK_PASSWORD` nell'ambiente; le
+credenziali non vengono salvate. Motore e ricerca non importano questo modulo
+(import-linter): i dati entrano in una strategia solo con una pre-registrazione.
+
+Esecuzione automatica ogni 30 minuti su Windows (MSYS2): `scripts/news-archive.sh`
+da Utilità di pianificazione; il registro è in `data/news/archive.log`.

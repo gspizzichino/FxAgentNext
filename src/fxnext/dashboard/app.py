@@ -21,6 +21,7 @@ from fastapi.templating import Jinja2Templates
 from fxnext.dashboard import charts
 from fxnext.dashboard import readers as rd
 from fxnext.dashboard.telegram import TelegramConfig
+from fxnext.news.archive import archive_status
 from fxnext.research.protocol import SPLITS
 
 HERE = Path(__file__).parent
@@ -277,6 +278,7 @@ def create_app(sources: rd.Sources, *, today: date | None = None) -> FastAPI:
             split_of_year={y: rd.split_of_day(date(y, 7, 1)) for y in cov["years"]},
             datasets=rd.list_datasets(sources.datasets),
             refresh=REFRESH_SECONDS,
+            news=archive_status(sources.news),
         )
 
     @app.get("/sistema", response_class=HTMLResponse)
