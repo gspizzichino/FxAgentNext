@@ -101,7 +101,7 @@ macro, PolicyCandidate/shadow governance, ZeroMQ, Streamlit come control plane.
 | FR-P1 | Position management riconciliato con il broker; SL/TP broker-side; protezione indipendente dalla generazione segnali. | M3 |
 | FR-K2 | Kill switch persistente che blocca nuove entrate senza toccare la protezione delle posizioni. | M3 |
 | FR-AI1 | Agente di ricerca asincrono che produce proposte e specifiche di test, mai configurazione attiva. | M4 |
-| FR-UI1 | Dashboard read-only. | M4 |
+| FR-UI1 | App web locale per la supervisione di un sistema non presidiato. Legge i risultati; i soli comandi (sospendi entrate, ferma motore, kill switch, decisioni sulle proposte AI) arrivano con M3/M4 come richieste tracciate che il motore legge, con conferma e motivo. Nessun ordine manuale. *Modificato il 2026-11-16 su decisione di Giacomo; prima: "Dashboard read-only".* | M4 (prime schermate di ricerca anticipate) |
 
 ### 2.2 Non funzionali
 

@@ -1,4 +1,4 @@
-"""Command line: download, import, inspect, replay, research, verify, explain."""
+"""Command line: download, import, inspect, replay, research, verify, explain, dashboard."""
 
 from __future__ import annotations
 
@@ -118,6 +118,20 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("symbol")
     p.add_argument("at", type=_dt)
     p.add_argument("--datasets", type=Path, default=Path("data/datasets"))
+
+    p = sub.add_parser("dashboard", help="start the web app on this machine (read-only)")
+    p.add_argument(
+        "--host", default="127.0.0.1", help="use your Tailscale IP to reach it from the phone"
+    )
+    p.add_argument("--port", type=int, default=8765)
+    p.add_argument("--research", type=Path, default=Path("research"))
+    p.add_argument("--prereg", type=Path, action="append", help="default: data/prereg")
+    p.add_argument("--datasets", type=Path, default=Path("data/datasets"))
+    p.add_argument("--raw", type=Path, action="append", help="raw caches; default: data/raw")
+    p.add_argument("--frozen", type=Path, action="append", help="folders with frozen documents")
+
+    p = sub.add_parser("notify-test", help="send a Telegram test message")
+    p.add_argument("--text", default="FxAgent Next: messaggio di prova. Gli avvisi arrivano qui.")
 
     args = parser.parse_args(argv)
     if args.cmd == "download":
@@ -256,7 +270,53 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "explain":
         print(json.dumps(explain(args.run_dir, args.symbol, args.at, args.datasets), indent=2))
         return 0
+    if args.cmd == "dashboard":
+        return _dashboard(args)
+    if args.cmd == "notify-test":
+        from fxnext.dashboard.telegram import (
+            CHAT_ENV,
+            TOKEN_ENV,
+            TelegramConfig,
+            TelegramError,
+            send_message,
+        )
+
+        cfg = TelegramConfig.from_env()
+        if cfg is None:
+            print(f"Imposta {TOKEN_ENV} e {CHAT_ENV} prima di provare.", file=sys.stderr)
+            return 1
+        try:
+            send_message(cfg, args.text)
+        except TelegramError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        print("Messaggio inviato.")
+        return 0
     return 2
+
+
+def _dashboard(args: argparse.Namespace) -> int:
+    import uvicorn
+
+    from fxnext.dashboard.app import create_app
+    from fxnext.dashboard.readers import Sources
+
+    if args.host in ("0.0.0.0", "::"):
+        print(
+            "Attenzione: l'app sarà raggiungibile da tutta la rete. "
+            "Per il telefono usa l'IP Tailscale del PC.",
+            file=sys.stderr,
+        )
+    sources = Sources(
+        research=args.research,
+        prereg=tuple(args.prereg or [Path("data/prereg")]),
+        datasets=args.datasets,
+        raw=tuple(args.raw or [Path("data/raw")]),
+        frozen=tuple(args.frozen or []),
+    )
+    print(f"FxAgent Next su http://{args.host}:{args.port}  (Ctrl+C per fermare)")
+    uvicorn.run(create_app(sources), host=args.host, port=args.port, log_level="warning")
+    return 0
 
 
 if __name__ == "__main__":

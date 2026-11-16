@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Confronto coppie · FxAgent Next{% endblock %}
+{% block body %}
+<div class="head"><span class="crumb">Ricerca / {{ s._name }}</span><h1>Confronto tra coppie</h1>
+<p class="muted">{{ s.note }}</p>
+{% if summaries|length > 1 %}<div class="btnrow">{% for x in summaries %}<a class="pill {% if x._name == s._name %}p-acc{% else %}p-na{% endif %}" href="/confronto/{{ x._name }}">{{ x._name }}</a>{% endfor %}</div>{% endif %}</div>
+<div class="panel"><div class="ph"><h2>Expectancy con intervallo di confidenza</h2><span class="muted">quadrato pieno = netto, vuoto = lordo</span></div>{{ forest }}</div>
+<div class="panel"><div class="ph"><h2>Per coppia</h2></div><div class="tw"><table><thead><tr><th>Coppia</th><th>Esperimento</th><th>Trade</th><th>Netto R</th><th>IC 95%</th><th>Lordo R</th><th>%ile dir. casuale</th><th>%ile tempo casuale</th></tr></thead><tbody>
+{% for sym, d in per %}<tr><td><b>{{ sym }}</b></td><td><a class="mono" href="/esperimenti/{{ d.fingerprint[:8] }}">{{ d.experiment_id }}</a></td><td>{{ d.exec_x1.trades|int }}</td><td class="{{ d.exec_x1.expectancy|cls }}">{{ d.exec_x1.expectancy|r }}</td><td>{{ (d.exec_x1.ci_low, d.exec_x1.ci_high)|ci }}</td><td class="{{ d.signal.expectancy|cls }}">{{ d.signal.expectancy|r }}</td>
+<td>{% if d.benchmarks %}{{ d.benchmarks.random_direction.baseline_percentile|num(1) }}°{% else %}–{% endif %}</td><td>{% if d.benchmarks %}{{ d.benchmarks.random_time.baseline_percentile|num(1) }}°{% else %}–{% endif %}</td></tr>{% endfor %}
+</tbody></table></div></div>
+<div class="panel"><div class="ph"><h2>R per anno</h2></div>{{ bars }}</div>
+{% if overlap %}<div class="panel"><h2>Sovrapposizioni</h2><dl class="kv">
+<dt>Trade aperti insieme ad altre coppie</dt><dd>{{ overlap.trades_overlapping_another_symbol|int }} su {{ overlap.trades|int }}</dd>
+<dt>Gruppi sovrapposti</dt><dd>{{ overlap.clusters|int }}, di cui {{ overlap.clusters_across_symbols|int }} multi-coppia</dd>
+<dt>Posizioni contemporanee</dt><dd>max {{ overlap.max_open_at_once }}, media {{ overlap.mean_open_while_any_open|num }}</dd>
+<dt>Stessa esposizione al dollaro</dt><dd>{{ overlap.pairs_same_usd_direction|int }} coppie di trade (opposta {{ overlap.pairs_opposite_usd_direction|int }})</dd>
+</dl><p class="note">Dato descrittivo: le coppie non sono prove indipendenti.</p></div>{% endif %}
+{% endblock %}

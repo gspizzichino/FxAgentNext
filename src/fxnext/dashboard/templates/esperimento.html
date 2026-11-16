@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{ r.experiment_id }} · FxAgent Next{% endblock %}
+{% block body %}
+<div class="head"><span class="crumb"><a href="/esperimenti">Esperimenti</a> / {{ r.experiment_id }}</span>
+<h1>{{ r.experiment_id }}</h1>
+<div class="btnrow"><span class="pill p-na">{{ r.criteria.outcome }}</span><span class="pill p-acc">MODELLED</span><span class="pill p-seal">Immutabile</span></div>
+<p class="muted">{{ r.hypothesis }}</p></div>
+<div class="grid2">
+  <div class="panel"><h2>Identità</h2><dl class="kv">
+    <dt>Intervallo</dt><dd>{{ r.interval.start[:10] }} → {{ r.interval.end[:10] }}</dd>
+    {% if r.strategy %}<dt>Strategia</dt><dd class="mono">{{ r.strategy.strategy_id }} v{{ r.strategy.strategy_version }}</dd>
+    <dt>Parametri</dt><dd>canale {{ r.strategy.params.channel_slots }} · stop {{ r.strategy.params.stop_atr_mult|num(1) }} ATR · target {{ r.strategy.params.target_r|num(1) }} R · {{ r.strategy.params.signal_timeframe }}</dd>{% else %}<dt>Strategia</dt><dd class="muted">non registrata in questo report (versione precedente del codice)</dd>{% endif %}
+    <dt>Fingerprint</dt><dd class="mono">{{ r.fingerprint }}</dd>
+    <dt>Pre-reg sha256</dt><dd class="mono">{{ r.prereg_sha256 }}</dd>
+    <dt>Codice</dt><dd class="mono">{{ r.versions.code_version }}</dd>
+    <dt>Costi</dt><dd>{{ r.inputs.costs.version }} · commissione {{ r.inputs.costs.commission_pips|num }} pip per lato</dd>
+  </dl></div>
+  <div class="panel"><h2>Copertura e riconciliazione</h2><dl class="kv">
+  {% for sym, c in r.coverage.items() %}
+    <dt>{{ sym }}</dt><dd>{{ c.evaluations|int }} valutazioni · {{ c.candidates|int }} candidati · ambigui {{ c.ambiguous }} · buchi {{ c.path_gap }}</dd>
+    <dt>Esiti</dt><dd>{% for k, v in c.exec_reasons.items() %}{{ k }} {{ v|int }}{% if not loop.last %} · {% endif %}{% endfor %}</dd>
+    {% set rec = (r.reconciliation or {}).get(sym) %}
+    <dt>Bilancio</dt><dd>{% if rec and rec.balanced %}<span class="pill p-ok">candidati = eseguiti + counterfactual + non entrati</span>{% elif rec %}<span class="pill p-bad">sbilanciato</span>{% else %}–{% endif %}</dd>
+  {% endfor %}
+  </dl></div>
+</div>
+<div class="panel"><div class="ph"><h2>R cumulati, exec ×1</h2><span class="muted">trade per trade, in ordine di uscita</span></div>{{ equity }}</div>
+<div class="panel"><div class="ph"><h2>Rendimenti per stream</h2><span class="muted">R = 1,5 × ATR alla decisione</span></div>
+<div class="tw"><table><thead><tr><th>Stream</th><th>Trade</th><th>Indip.</th><th>Expectancy</th><th>IC 95%</th><th>Win %</th><th>PF</th><th>Max DD R</th><th>Totale R</th></tr></thead><tbody>
+{% for name, s in streams %}<tr><td>{{ name }}</td><td>{{ s.trades|int }}</td><td>{{ s.independent|int }}</td><td class="{{ s.expectancy|cls }}">{{ s.expectancy|r }}</td><td>{{ (s.ci_low, s.ci_high)|ci }}</td><td>{{ (s.win_rate * 100)|num(1) }}</td><td>{{ s.profit_factor|num }}</td><td>{{ s.max_drawdown_r|num(1) }}</td><td class="{{ s.total_r|cls }}">{{ s.total_r|r(1) }}</td></tr>{% endfor %}
+<tr><td>broker osservato</td><td colspan="8" class="muted" style="text-align:left">vuoto fino a M3</td></tr>
+</tbody></table></div></div>
+{% if bench_chart %}<div class="panel"><div class="ph"><h2>Contro i benchmark nulli</h2><span class="muted">fascia 5°–95° percentile, tacca = mediana</span></div>{{ bench_chart }}
+<p class="note">{% for k, v in bench.items() if v is mapping %}{{ k }}: {{ v.baseline_percentile|num(1) }}° percentile. {% endfor %}Soglia per la validazione: 95°.</p></div>{% endif %}
+<div class="panel"><div class="ph"><h2>R per anno</h2></div>{{ year_chart }}</div>
+<div class="panel"><div class="ph"><h2>Ultimi trade</h2><span class="muted">30 più recenti, exec ×1</span></div>
+<div class="tw"><table><thead><tr><th>Coppia</th><th>Dir.</th><th>Ingresso (UTC)</th><th>Uscita (UTC)</th><th>Esito</th><th>R lordo</th><th>R netto</th><th>MAE</th><th>MFE</th></tr></thead><tbody>
+{% for t in trades %}<tr><td>{{ t.symbol }}</td><td>{{ t.direction }}</td><td>{{ ts(t.entry_ns) }}</td><td>{{ ts(t.exit_ns) }}</td><td>{{ t.reason }}</td><td class="{{ t.r_gross|cls }}">{{ t.r_gross|r(2) }}</td><td class="{{ t.r_net|cls }}">{{ t.r_net|r(2) }}</td><td>{{ t.mae_r|r(2) }}</td><td>{{ t.mfe_r|r(2) }}</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endblock %}

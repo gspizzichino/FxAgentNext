@@ -1,0 +1,271 @@
+{
+  "benchmarks": {
+    "always_long": -0.09342578607223645,
+    "always_short": -0.06837026879104911,
+    "random_direction": {
+      "baseline_percentile": 93.4,
+      "median": -0.07561313498926467,
+      "p05": -0.12400815288293261,
+      "p95": -0.025412743017486812,
+      "repetitions": 1000
+    },
+    "random_time": {
+      "baseline_percentile": 76.4,
+      "median": -0.05884687882163167,
+      "p05": -0.12512347782504823,
+      "p95": 0.003680856447108068,
+      "repetitions": 1000
+    }
+  },
+  "by_year_r": {
+    "2015": -48.31589780904074,
+    "2016": 0.7833466268378988,
+    "2017": -22.818853084680057,
+    "2018": -15.40243448034154,
+    "2019": 23.642844918408823,
+    "2020": 9.675110150218705
+  },
+  "coverage": {
+    "GBPUSD": {
+      "ambiguous": 2,
+      "by_reason": {
+        "CANDIDATE": 2615,
+        "FLAT_BAR_IN_WINDOW": 67,
+        "INSUFFICIENT_HISTORY": 21,
+        "MARKET_CLOSED": 318,
+        "NO_EVENT": 34323
+      },
+      "candidates": 2615,
+      "end_of_data": 1,
+      "evaluations": 37344,
+      "exec_not_entered": 0,
+      "exec_reasons": {
+        "END_OF_DATA": 1,
+        "STOP": 1113,
+        "STOP_GAP": 17,
+        "TARGET": 584
+      },
+      "not_filled": 0,
+      "path_gap": 0,
+      "path_quality": {
+        "in_session_minutes": 2240640,
+        "in_session_missing": 0,
+        "minutes_flat": 1886,
+        "minutes_valid": 2238754
+      },
+      "weekend_crossings": 140
+    }
+  },
+  "criteria": {
+    "note": "development split: no decision is taken",
+    "outcome": "NOT_APPLICABLE"
+  },
+  "experiment_id": "gbpusd-dev-001",
+  "fingerprint": "d7cad2df0938f2992b893fdff275a99da7d57cab62be07fd154723529925d4f3",
+  "hypothesis": "Baseline Donchian breakout (config di default) su GBPUSD M15 BID: expectancy netta in R dopo i costi maggiore di zero e sopra i benchmark, sul periodo di sviluppo.",
+  "inputs": {
+    "costs": {
+      "commission_pips": 0.35,
+      "multiplier": 1.0,
+      "slippage_entry_pips": 0.1,
+      "slippage_stop_pips": 0.2,
+      "slippage_target_pips": 0.0,
+      "version": "cost-model-v1"
+    },
+    "datasets": [
+      "4e95b394689c04696c71b9ffef2504ce6c0d147aae5f86dc3ddcb9c113f344a8"
+    ],
+    "exec_params": {
+      "ambiguity": "STOP_FIRST",
+      "latency_minutes": 0,
+      "path_gap_minutes": 60,
+      "time_exit_slots": 120,
+      "version": "exec-model-v1"
+    },
+    "output_hash": "910913fd501971108e37b741db495b08851362ed58426d7b1223355d074e7ff6",
+    "paths": {
+      "GBPUSD": "098f7a1d7330890909d1659231ca65a06d788269f9ae33c6df461a9d4fe86c08"
+    },
+    "run_fingerprint": "ad3785805d30535f9f7b325dd7c32f3dac2c0974eef6fd7310c1b438621aeb69",
+    "source_paths": {
+      "GBPUSD": "098f7a1d7330890909d1659231ca65a06d788269f9ae33c6df461a9d4fe86c08"
+    }
+  },
+  "interval": {
+    "end": "2021-01-01T00:00:00+00:00",
+    "start": "2015-01-01T00:00:00+00:00"
+  },
+  "per_symbol": {
+    "GBPUSD": {
+      "by_year_r": {
+        "2015": -48.31589780904074,
+        "2016": 0.7833466268378988,
+        "2017": -22.818853084680057,
+        "2018": -15.40243448034154,
+        "2019": 23.642844918408823,
+        "2020": 9.675110150218705
+      },
+      "exec_x1": {
+        "ci_high": 0.039206926304723104,
+        "ci_low": -0.0993847535949281,
+        "expectancy": -0.030592697595447436,
+        "independent": 1714,
+        "max_drawdown_days": 2156.0173611111113,
+        "max_drawdown_r": 106.01586728001728,
+        "profit_factor": 0.9560624830132999,
+        "total_r": -52.43588367859691,
+        "trades": 1714,
+        "trades_per_month": 23.80012545620438,
+        "win_rate": 0.34072345390898484
+      },
+      "signal": {
+        "ci_high": 0.08574809894518304,
+        "ci_low": -0.04338498685670559,
+        "expectancy": 0.02166854474570504,
+        "independent": 1712,
+        "max_drawdown_days": 1679.954861111111,
+        "max_drawdown_r": 70.69492686146776,
+        "profit_factor": 1.0328047776462939,
+        "total_r": 56.61990742052727,
+        "trades": 2613,
+        "trades_per_month": 36.283388458029194,
+        "win_rate": 0.3413700727133563
+      }
+    }
+  },
+  "prereg_sha256": "0fecc74129f6f141400417dd0e32c7a54f2f4a60eebb45c4f3c0b5a589262581",
+  "provenance": "REAL",
+  "reconciliation": {
+    "GBPUSD": {
+      "balanced": true,
+      "candidates": 2615,
+      "candidates_available_after_end": 0,
+      "candidates_available_before_start": 0,
+      "candidates_expiring_after_end": 0,
+      "entries_outside_split": 0,
+      "exec_counterfactual": 900,
+      "exec_end_of_data": 1,
+      "exec_executed": 1715,
+      "exec_executed_counted": 1714,
+      "exec_not_entered": 0,
+      "exits_outside_split": 0,
+      "signal_counted": 2613,
+      "signal_fills": 2615,
+      "signal_reasons": {
+        "END_OF_DATA": 2,
+        "STOP": 1698,
+        "STOP_GAP": 23,
+        "TARGET": 891,
+        "TIME": 1
+      },
+      "unique_keys": 2615
+    }
+  },
+  "split": "development",
+  "strategy": {
+    "params": {
+      "atr_slots": 14,
+      "basis": "BID",
+      "channel_slots": 20,
+      "signal_timeframe": "H1",
+      "stop_atr_mult": 1.5,
+      "target_r": 2.0,
+      "validity_slots": 1
+    },
+    "strategy_id": "baseline_donchian_breakout",
+    "strategy_version": "1"
+  },
+  "streams": {
+    "broker": null,
+    "counterfactual": {
+      "ci_high": 0.011143479210867191,
+      "ci_low": -0.20465351314147773,
+      "expectancy": -0.09858040934371358,
+      "independent": 680,
+      "max_drawdown_days": 1717.0597222222223,
+      "max_drawdown_r": 100.98176301571989,
+      "profit_factor": 0.8629961639821881,
+      "total_r": -88.62378799999851,
+      "trades": 899,
+      "trades_per_month": 12.483263001824817,
+      "win_rate": 0.3192436040044494
+    },
+    "exec": {
+      "x1": {
+        "ci_high": 0.039206926304723104,
+        "ci_low": -0.0993847535949281,
+        "expectancy": -0.030592697595447436,
+        "independent": 1714,
+        "max_drawdown_days": 2156.0173611111113,
+        "max_drawdown_r": 106.01586728001728,
+        "profit_factor": 0.9560624830132999,
+        "total_r": -52.43588367859691,
+        "trades": 1714,
+        "trades_per_month": 23.80012545620438,
+        "win_rate": 0.34072345390898484
+      },
+      "x1.5": {
+        "ci_high": 0.022299033770209763,
+        "ci_low": -0.11640494662528829,
+        "expectancy": -0.04751167982008794,
+        "independent": 1714,
+        "max_drawdown_days": 2156.0173611111113,
+        "max_drawdown_r": 121.50538664231009,
+        "profit_factor": 0.9329096597056182,
+        "total_r": -81.43501921163073,
+        "trades": 1714,
+        "trades_per_month": 23.80012545620438,
+        "win_rate": 0.34072345390898484
+      },
+      "x2": {
+        "ci_high": 0.0055122148745370145,
+        "ci_low": -0.13348262295328145,
+        "expectancy": -0.06443066204464758,
+        "independent": 1714,
+        "max_drawdown_days": 2156.0173611111113,
+        "max_drawdown_r": 139.42697854715627,
+        "profit_factor": 0.910521917611926,
+        "total_r": -110.43415474452596,
+        "trades": 1714,
+        "trades_per_month": 23.80012545620438,
+        "win_rate": 0.34072345390898484
+      }
+    },
+    "exec_target_first": {
+      "ci_high": 0.042107410543685574,
+      "ci_low": -0.0956552853554746,
+      "expectancy": -0.02708161188369941,
+      "independent": 1714,
+      "max_drawdown_days": 2156.0173611111113,
+      "max_drawdown_r": 99.99786637008118,
+      "profit_factor": 0.9610369019186461,
+      "total_r": -46.41788276866079,
+      "trades": 1714,
+      "trades_per_month": 23.80012545620438,
+      "win_rate": 0.3418903150525088
+    },
+    "signal": {
+      "ci_high": 0.08574809894518304,
+      "ci_low": -0.04338498685670559,
+      "expectancy": 0.02166854474570504,
+      "independent": 1712,
+      "max_drawdown_days": 1679.954861111111,
+      "max_drawdown_r": 70.69492686146776,
+      "profit_factor": 1.0328047776462939,
+      "total_r": 56.61990742052727,
+      "trades": 2613,
+      "trades_per_month": 36.283388458029194,
+      "win_rate": 0.3413700727133563
+    }
+  },
+  "versions": {
+    "code_version": "a8291fb04ab4f4574acc27979830e1bfe0f2e000",
+    "cost_model": "cost-model-v1",
+    "exec_model": "exec-model-v1",
+    "protocol": "protocol-v1",
+    "research": "research-v1"
+  },
+  "warnings": [
+    "symbols evaluated: GBPUSD"
+  ]
+}

@@ -90,3 +90,22 @@ uv run fxnext research-summary research/<fp1> research/<fp2> --out research/summ
   apertura serve `--reopen-holdout`.
 - **Interpretazione**: tutti i rendimenti sono `MODELLED` e nessun report
   dimostra un edge da solo.
+
+## App web (prime schermate)
+
+```powershell
+uv run fxnext dashboard                      # http://127.0.0.1:8765
+uv run fxnext dashboard --frozen <cartella>  # verifica anche i documenti congelati (*.sha256)
+```
+
+L'app gira sul PC e legge soltanto: `research/` (report, riepiloghi, esiti),
+`data/prereg/` (sha256 ricalcolato a ogni apertura), `data/datasets/` (manifest) e
+i registri del downloader in `data/raw/`. Non avvia run né download, non ha rotte
+che scrivono e non mostra mai i numeri dell'holdout. Le schermate operative
+(Oggi, Posizioni, Segnali, Proposte AI) sono segnaposto fino a M3/M4.
+
+Dal telefono: installa Tailscale su PC e telefono e avvia con
+`--host <IP Tailscale del PC>`; non usare `0.0.0.0` su reti che non controlli.
+
+Avvisi Telegram: crea un bot con @BotFather, imposta `FXNEXT_TELEGRAM_TOKEN` e
+`FXNEXT_TELEGRAM_CHAT_ID` sul PC e prova con `uv run fxnext notify-test`.

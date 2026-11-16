@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · FxAgent Next{% endblock %}
+{% block body %}
+<div class="head"><span class="crumb">{{ title }}</span><h1>{{ title }}</h1></div>
+<div class="panel">{% if milestone %}<span class="pill p-na">Arriva con {{ milestone }}</span>{% endif %}<p>{{ text }}</p></div>
+{% endblock %}
