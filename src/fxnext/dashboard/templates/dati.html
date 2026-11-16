@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Dati · FxAgent Next{% endblock %}
 {% block body %}
-<div class="head"><span class="crumb">Sistema</span><h1>Copertura dei dati storici</h1>
+<div class="head"><span class="crumb">Sistema · <span id="refreshed">si aggiorna ogni {{ refresh }} secondi</span></span><h1>Copertura dei dati storici</h1>
 <p class="muted">Giorni scaricati per coppia, lato e anno, letti dai registri del downloader. Questa pagina non avvia download.{% if cov.latest_fetch %} Ultimo file scaricato: {{ cov.latest_fetch[:16].replace("T", " ") }} UTC.{% endif %}</p></div>
 <div class="panel"><div class="ph"><h2>Mappa per anno</h2></div>
 <div class="legend"><span><i class="c-dev"></i>completo</span><span><i class="c-val"></i>parziale</span><span><i style="background:var(--neg-soft);border:1px solid var(--neg)"></i>giorni FAILED</span></div>

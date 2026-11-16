@@ -24,6 +24,7 @@ from fxnext.dashboard.telegram import TelegramConfig
 from fxnext.research.protocol import SPLITS
 
 HERE = Path(__file__).parent
+REFRESH_SECONDS = 30  # pages that follow something in progress (download, later the engine)
 
 NAV = [
     (
@@ -275,6 +276,7 @@ def create_app(sources: rd.Sources, *, today: date | None = None) -> FastAPI:
             expected={y: rd.expected_days(y, now) for y in cov["years"]},
             split_of_year={y: rd.split_of_day(date(y, 7, 1)) for y in cov["years"]},
             datasets=rd.list_datasets(sources.datasets),
+            refresh=REFRESH_SECONDS,
         )
 
     @app.get("/sistema", response_class=HTMLResponse)

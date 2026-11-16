@@ -288,3 +288,9 @@ def test_notify_test_without_configuration(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.delenv(tg.TOKEN_ENV, raising=False)
     monkeypatch.delenv(tg.CHAT_ENV, raising=False)
     assert cli_main(["notify-test"]) == 1
+
+
+def test_data_page_refreshes_itself(tree: rd.Sources) -> None:
+    client = TestClient(create_app(tree))
+    assert 'data-refresh="30"' in client.get("/dati").text
+    assert "data-refresh" not in client.get("/stato").text

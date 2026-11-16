@@ -7,7 +7,7 @@
 <title>{% block title %}FxAgent Next{% endblock %}</title>
 <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
+<body{% if refresh %} data-refresh="{{ refresh }}"{% endif %}>
 <div class="app">
   <nav class="side" aria-label="Sezioni">
     <div class="brand"><b>FxAgent Next</b><span>ricerca · demo · sorveglianza</span></div>
@@ -23,5 +23,31 @@
   </nav>
   <main><div class="view">{% block body %}{% endblock %}</div></main>
 </div>
+{% if refresh %}<script>
+// Aggiorna il contenuto della pagina senza ricaricarla; si ferma quando la scheda è nascosta.
+(function () {
+  const every = Number(document.body.dataset.refresh) * 1000;
+  const stamp = () => {
+    const el = document.getElementById("refreshed");
+    if (el) el.textContent = "Aggiornato alle " + new Date().toLocaleTimeString("it-IT");
+  };
+  async function tick() {
+    if (document.hidden) return;
+    try {
+      const r = await fetch(location.href, { cache: "no-store" });
+      if (!r.ok) throw new Error(r.status);
+      const doc = new DOMParser().parseFromString(await r.text(), "text/html");
+      const fresh = doc.querySelector("main .view");
+      if (fresh) { document.querySelector("main .view").replaceWith(fresh); stamp(); }
+    } catch (e) {
+      const el = document.getElementById("refreshed");
+      if (el) el.textContent = "Aggiornamento non riuscito, riprovo tra poco";
+    }
+  }
+  stamp();
+  setInterval(tick, every);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) tick(); });
+})();
+</script>{% endif %}
 </body>
 </html>
