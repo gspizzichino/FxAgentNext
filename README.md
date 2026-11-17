@@ -97,6 +97,18 @@ uv run fxnext hypothesis prereg/s1-failure-dev-001.toml   # ipotesi S0-S3, S7 (s
 - **Interpretazione**: tutti i rendimenti sono `MODELLED` e nessun report
   dimostra un edge da solo.
 
+## Carry e momentum G10 (M5, solo sviluppo)
+
+Pre-registrazione `prereg/g10-cm-dev-001.toml`, generata dal testo congelato il 2026-11-17.
+Scelte di dettaglio in `docs/M5-g10.md`.
+
+```bash
+uv run fxnext g10-download --to-year 2013        # candele giornaliere BID+ASK 2003-2013, 9 coppie
+uv run fxnext g10-rates                          # tassi OCSE 3 mesi da FRED, CSV con hash
+uv run fxnext g10-check prereg/g10-cm-dev-001.toml   # controllo dei dati, nessun esito
+uv run fxnext g10-run prereg/g10-cm-dev-001.toml     # 7 varianti, casuali, criteri
+```
+
 ## App web (prime schermate)
 
 ```powershell
