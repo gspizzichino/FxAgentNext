@@ -78,10 +78,15 @@ class TradeSpec:
     target: float
     available_at_ns: int
     expires_at_ns: int
+    # Scheduled exit (hypotheses S1-S7): replaces the H1-slot time exit. The trade
+    # leaves at the close of the last minute before this instant (TIME semantics).
+    exit_at_ns: int | None = None
+    # R unit when the stop is not a real level (entry test with a pure time exit).
+    unit_risk: float | None = None
 
     @property
     def risk(self) -> float:
-        return abs(self.entry_ref - self.stop)
+        return self.unit_risk if self.unit_risk is not None else abs(self.entry_ref - self.stop)
 
     @classmethod
     def of(cls, symbol: str, c: Candidate) -> TradeSpec:
@@ -183,7 +188,12 @@ class Simulator:
             spread = 0.0
 
         # --- exit search on [j, end)
-        time_exit = self._time_exit_ns(entry_ns, params.time_exit_slots)
+        if spec.exit_at_ns is not None:
+            if spec.exit_at_ns <= entry_ns:
+                raise ValueError("scheduled exit is not after the entry")
+            time_exit = spec.exit_at_ns
+        else:
+            time_exit = self._time_exit_ns(entry_ns, params.time_exit_slots)
         end = int(np.searchsorted(t, time_exit))
         op = self.cols[f"{side}_open"][j:end]
         hi = self.cols[f"{side}_high"][j:end]

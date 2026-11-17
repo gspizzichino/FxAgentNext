@@ -110,6 +110,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("results", type=Path, nargs="+", help="research/<fingerprint> directories")
     p.add_argument("--out", type=Path, required=True)
 
+    p = sub.add_parser("hypothesis", help="run a pre-registered hypothesis S0-S3/S7 (M4)")
+    p.add_argument("prereg", type=Path)
+    p.add_argument("--paths", type=Path, default=Path("data/paths"))
+    p.add_argument("--research", type=Path, default=Path("research"))
+    p.add_argument("--code-version", default=None)
+
     p = sub.add_parser("verify", help="verify a run destination")
     p.add_argument("run_dir", type=Path)
 
@@ -263,6 +269,24 @@ def main(argv: list[str] | None = None) -> int:
 
         agg = write_summary(args.results, args.out)
         print(json.dumps({"out": str(args.out), "pooled": agg["pooled"]["exec_x1"]}, indent=2))
+        return 0
+    if args.cmd == "hypothesis":
+        from fxnext.research.hyp.runner import run_hypothesis
+
+        hyp = run_hypothesis(
+            args.prereg,
+            paths_root=args.paths,
+            research_root=args.research,
+            code_version=args.code_version or code_version(),
+            progress=lambda m: print(m, file=sys.stderr, flush=True),
+        )
+        outcome = hyp.report.get("assessment", {}).get("outcome", "DESCRIPTIVE")
+        print(
+            json.dumps(
+                {"fingerprint": hyp.fingerprint, "path": str(hyp.path), "outcome": outcome},
+                indent=2,
+            )
+        )
         return 0
     if args.cmd == "verify":
         manifest = read_manifest(args.run_dir)

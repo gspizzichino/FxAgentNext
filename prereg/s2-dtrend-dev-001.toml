@@ -1,0 +1,76 @@
+# Generated from the frozen text prereg-S0-S3-S7-congelato-2026-11-11 without changing
+# its rules. Any change to this file is a new pre-registration with a new experiment_id.
+experiment_id = "s2-dtrend-dev-001"
+kind = "s2_daily_trend"
+hypothesis = "Su barre giornaliere un breakout di N giorni seguito fino al breakout opposto ha expectancy netta in R > 0, swap incluso. Esplorativa (P1)."
+frozen_text_sha256 = "589bd00a34d3c9f13338f8797421dd623b1f8788d48df6b84bd9232e191a9192"
+split = "development"
+exploratory = true
+main_variant = "N55-s2-M20"
+entry_test_bars = 10
+
+[swap]
+markup_pct_per_year = 1.0
+
+[[data]]
+symbol = "EURUSD"
+path = "3f75a61a85f47cf95d53142dcb3b1165c0c71824c3627019b6acab36c6b89abe"
+reference_report = "eurusd-dev-001"
+
+[[data]]
+symbol = "GBPUSD"
+path = "098f7a1d7330890909d1659231ca65a06d788269f9ae33c6df461a9d4fe86c08"
+reference_report = "gbpusd-dev-001"
+
+[[data]]
+symbol = "USDJPY"
+path = "dde6863b63e0a23eaa4fdc7753a567357d49acd8ae86ab46f25cbd48f65a9c12"
+reference_report = "usdjpy-dev-001"
+
+[[variants]]
+name = "N20-s2-M10"
+n = 20
+s = 2.0
+m = 10
+
+[[variants]]
+name = "N20-s2-M20"
+n = 20
+s = 2.0
+m = 20
+
+[[variants]]
+name = "N20-s3-M10"
+n = 20
+s = 3.0
+m = 10
+
+[[variants]]
+name = "N20-s3-M20"
+n = 20
+s = 3.0
+m = 20
+
+[[variants]]
+name = "N55-s2-M10"
+n = 55
+s = 2.0
+m = 10
+
+[[variants]]
+name = "N55-s2-M20"
+n = 55
+s = 2.0
+m = 20
+
+[[variants]]
+name = "N55-s3-M10"
+n = 55
+s = 3.0
+m = 10
+
+[[variants]]
+name = "N55-s3-M20"
+n = 55
+s = 3.0
+m = 20

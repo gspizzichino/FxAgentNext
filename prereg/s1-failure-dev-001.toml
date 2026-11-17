@@ -1,0 +1,75 @@
+# Generated from the frozen text prereg-S0-S3-S7-congelato-2026-11-11 without changing
+# its rules. Any change to this file is a new pre-registration with a new experiment_id.
+experiment_id = "s1-failure-dev-001"
+kind = "s1_failure_test"
+hypothesis = "Una rottura del massimo o minimo di 20 barre che richiude subito dentro e' seguita da un movimento contrario: expectancy netta in R > 0 dopo i costi e sopra i benchmark corretti per le varianti."
+frozen_text_sha256 = "589bd00a34d3c9f13338f8797421dd623b1f8788d48df6b84bd9232e191a9192"
+split = "development"
+exploratory = false
+entry_test_bars = 10
+
+[threshold]
+entry_test_min_win_rate = 0.52
+
+[[data]]
+symbol = "EURUSD"
+path = "3f75a61a85f47cf95d53142dcb3b1165c0c71824c3627019b6acab36c6b89abe"
+reference_report = "eurusd-dev-001"
+
+[[data]]
+symbol = "GBPUSD"
+path = "098f7a1d7330890909d1659231ca65a06d788269f9ae33c6df461a9d4fe86c08"
+reference_report = "gbpusd-dev-001"
+
+[[data]]
+symbol = "USDJPY"
+path = "dde6863b63e0a23eaa4fdc7753a567357d49acd8ae86ab46f25cbd48f65a9c12"
+reference_report = "usdjpy-dev-001"
+
+[[variants]]
+name = "M15-w0-k1.5"
+tf = "M15"
+w = 0
+k = 1.5
+
+[[variants]]
+name = "M15-w0-k2"
+tf = "M15"
+w = 0
+k = 2.0
+
+[[variants]]
+name = "M15-w1-k1.5"
+tf = "M15"
+w = 1
+k = 1.5
+
+[[variants]]
+name = "M15-w1-k2"
+tf = "M15"
+w = 1
+k = 2.0
+
+[[variants]]
+name = "H1-w0-k1.5"
+tf = "H1"
+w = 0
+k = 1.5
+
+[[variants]]
+name = "H1-w0-k2"
+tf = "H1"
+w = 0
+k = 2.0
+
+[[variants]]
+name = "H1-w1-k1.5"
+tf = "H1"
+w = 1
+k = 1.5
+
+[[variants]]
+name = "H1-w1-k2"
+tf = "H1"
+w = 1
+k = 2.0

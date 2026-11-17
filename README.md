@@ -74,7 +74,13 @@ path = "<PATH stampato da import>"
 uv run fxnext research prereg.toml          # replay + simulazione + benchmark + report
 uv run fxnext research prereg.toml --grid   # griglia informativa, solo sviluppo
 uv run fxnext research-summary research/<fp1> research/<fp2> --out research/summary-dev
+uv run fxnext hypothesis prereg/s1-failure-dev-001.toml   # ipotesi S0-S3, S7 (solo sviluppo)
 ```
+
+- **Ipotesi S0–S3 e S7**: le pre-registrazioni sono in `prereg/`, generate dal
+  testo congelato l'11/11/2026. Leggono i percorsi M1 dei report dev e girano
+  solo sullo split di sviluppo. Dettagli e scelte di lettura del testo in
+  [docs/M4-ipotesi.md](docs/M4-ipotesi.md).
 
 - **Confini**: ogni esperimento usa solo prezzi del proprio split; i trade
   ancora aperti alla fine sono `END_OF_DATA` ed esclusi. Per validazione e

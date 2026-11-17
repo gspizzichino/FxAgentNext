@@ -1,0 +1,2 @@
+# Pre-registrations are hashed byte for byte: same bytes on every platform.
+prereg/*.toml text eol=lf
