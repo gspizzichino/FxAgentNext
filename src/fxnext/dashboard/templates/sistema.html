@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Motore e avvisi · FxAgent Next{% endblock %}
+{% block body %}
+<div class="head"><span class="crumb">Sistema</span><h1>Motore e avvisi</h1></div>
+<div class="grid2">
+<div class="panel"><div class="ph"><h2>Motore</h2><span class="pill p-na">Arriva con M3</span></div>
+<p>Il motore sarà un processo separato che gira da solo. Da qui potrai sospendere le entrate, fermarlo o attivare il kill switch: ogni comando con conferma, motivo e registro. Non ci sarà nessun comando per aprire o chiudere trade a mano.</p></div>
+<div class="panel"><div class="ph"><h2>Telegram</h2>{% if telegram %}<span class="pill p-ok">Configurato</span>{% else %}<span class="pill p-wait">Da configurare</span>{% endif %}</div>
+{% if telegram %}<p>Bot pronto, chat {{ telegram.masked_chat }}. Per un messaggio di prova: <code>uv run fxnext notify-test</code>.</p>
+{% else %}<p>Imposta le variabili <code>FXNEXT_TELEGRAM_TOKEN</code> e <code>FXNEXT_TELEGRAM_CHAT_ID</code> sul PC e riavvia l'app. Poi prova con <code>uv run fxnext notify-test</code>.</p>{% endif %}
+<p class="note">Avvisi critici e di attenzione subito, il resto in un riepilogo. Un controllo esterno avviserà se il PC smette di dare segni di vita.</p></div>
+</div>
+{% endblock %}

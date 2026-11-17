@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Stato della ricerca · FxAgent Next{% endblock %}
+{% block body %}
+<div class="head"><span class="crumb">Ricerca</span><h1>Stato della ricerca</h1>
+<p class="muted">Cosa è stato eseguito, cosa aspetta e cosa resta sigillato.</p></div>
+{% if changed %}<div class="err">Attenzione: {{ changed|length }} pre-registrazioni sono cambiate dopo il run ({% for p in changed %}{{ p.experiment_id }}{% if not loop.last %}, {% endif %}{% endfor %}). <a href="/preregistrazioni">Dettagli</a></div>{% endif %}
+<div class="grid3">
+  <div class="panel"><div class="stat"><span class="v num">{{ experiments|length }}</span><span class="l">esperimenti eseguiti (esclusi i controlli)</span></div></div>
+  <div class="panel"><div class="stat"><span class="v num">{{ preregs|selectattr("status","equalto","NOT_RUN")|list|length }}</span><span class="l">pre-registrazioni pronte e non ancora eseguite</span></div></div>
+  <div class="panel"><div class="stat">
+    {% if summary %}<span class="v num {{ summary.pooled.exec_x1.expectancy|cls }}">{{ summary.pooled.exec_x1.expectancy|r }} R</span>
+    <span class="l">aggregato {{ summary._name }}: {{ summary.pooled.exec_x1.trades|int }} trade, IC {{ (summary.pooled.exec_x1.ci_low, summary.pooled.exec_x1.ci_high)|ci }}</span>
+    {% else %}<span class="v">–</span><span class="l">nessun riepilogo aggregato</span>{% endif %}
+  </div></div>
+</div>
+<div class="panel"><div class="ph"><h2>Esperimenti</h2><a href="/esperimenti" class="muted">Tutti →</a></div>
+<div class="tw"><table><thead><tr><th>Esperimento</th><th>Split</th><th>Trade</th><th>Netto R</th><th>IC 95%</th><th>Esito</th></tr></thead><tbody>
+{% for e in experiments %}<tr><td><a href="/esperimenti/{{ e.short }}" class="mono">{{ e.experiment_id }}</a></td><td>{{ e.split_label }}</td><td>{{ e.trades|int }}</td><td class="{{ e.expectancy|cls }}">{{ e.expectancy|r }}</td><td>{{ e.ci|ci }}</td><td><span class="pill {% if e.outcome == 'VALIDATION_PASSED' %}p-ok{% elif e.outcome == 'REJECTED' %}p-bad{% elif e.outcome == 'SEALED' %}p-seal{% else %}p-na{% endif %}">{{ e.outcome }}</span></td></tr>
+{% else %}<tr><td colspan="6" class="muted">Nessun esperimento nella cartella dei risultati.</td></tr>{% endfor %}
+</tbody></table></div></div>
+<div class="panel"><div class="ph"><h2>Regole che la pagina rispetta</h2></div>
+<div class="btnrow"><span class="pill p-seal">Holdout fino al {{ holdout_end }} sigillato</span><span class="pill p-seal">Validazione: una sola esecuzione</span><span class="pill p-acc">Rendimenti MODELLED</span></div>
+<p class="note">Sullo sviluppo il protocollo non decide (esito NOT_APPLICABLE). La soglia sui benchmark per la validazione è il 95° percentile.</p></div>
+{% endblock %}

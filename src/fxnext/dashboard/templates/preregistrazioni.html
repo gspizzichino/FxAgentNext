@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Pre-registrazioni · FxAgent Next{% endblock %}
+{% block body %}
+<div class="head"><span class="crumb">Ricerca</span><h1>Pre-registrazioni</h1>
+<p class="muted">Lo sha256 è ricalcolato a ogni apertura. Se un file è cambiato dopo il run lo vedi in rosso. Da qui non si modifica niente.</p></div>
+{% if frozen %}<div class="panel"><h2>Documenti congelati</h2><div class="tw"><table><thead><tr><th>File</th><th>sha256</th><th>Stato</th></tr></thead><tbody>
+{% for f in frozen %}<tr><td>{{ f.file }}</td><td class="mono">{{ f.actual[:16] }}…</td><td>{% if f.ok %}<span class="pill p-ok">Integro</span>{% else %}<span class="pill p-bad">Diverso dall'atteso</span>{% endif %}</td></tr>{% endfor %}
+</tbody></table></div></div>{% endif %}
+<div class="panel"><div class="list">
+{% for p in preregs %}<div class="li"><div><div class="t">{{ p.experiment_id or p.file }}</div><div class="mono muted">{{ p.file }} · {{ p.split_label }} · {{ p.symbols|join(", ") }}</div></div>
+<div>{% if p.status == "RUN" %}<span class="pill p-ok">Eseguita · {{ p.runs|join(", ") }}</span>{% elif p.status == "NOT_RUN" %}<span class="pill p-wait">Non eseguita</span>{% elif p.status == "CHANGED" %}<span class="pill p-bad">Cambiata dopo il run</span>{% else %}<span class="pill p-bad">Illeggibile</span>{% endif %}</div>
+<div class="d">{{ p.hypothesis or p.error }}<br><span class="mono">sha256 {{ p.sha256 }}</span></div></div>
+{% else %}<p class="muted">Nessun file .toml nelle cartelle configurate.</p>{% endfor %}
+</div></div>
+{% endblock %}

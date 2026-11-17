@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Esperimenti · FxAgent Next{% endblock %}
+{% block body %}
+<div class="head"><span class="crumb">Ricerca</span><h1>Registro degli esperimenti</h1>
+<p class="muted">Ogni riga è una cartella di risultati immutabile. L'identità è il fingerprint.</p></div>
+<div class="panel"><div class="tw"><table><thead><tr><th>Esperimento</th><th>Gruppo</th><th>Split</th><th>Coppie</th><th>Trade</th><th>Netto R</th><th>Esito</th><th>Riconciliazione</th><th>Fingerprint</th><th>Codice</th></tr></thead><tbody>
+{% for e in experiments %}<tr>
+<td>{% if e.split == 'holdout' %}<span class="mono">{{ e.experiment_id }}</span>{% else %}<a href="/esperimenti/{{ e.short }}" class="mono">{{ e.experiment_id }}</a>{% endif %}</td>
+<td>{{ e.group or "–" }}</td><td>{{ e.split_label }}</td><td>{{ e.symbols|join(", ") }}</td><td>{{ e.trades|int }}</td>
+<td class="{{ e.expectancy|cls }}">{{ e.expectancy|r }}</td>
+<td><span class="pill {% if e.outcome == 'SEALED' %}p-seal{% else %}p-na{% endif %}">{{ e.outcome }}</span></td>
+<td>{% if e.balanced %}<span class="pill p-ok">Bilanciata</span>{% elif e.balanced is none %}–{% else %}<span class="pill p-bad">Sbilanciata</span>{% endif %}</td>
+<td class="mono">{{ e.short }}…</td><td class="mono">{{ e.code_version[:7] }}</td></tr>
+{% else %}<tr><td colspan="10" class="muted">Nessun esperimento.</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% if summaries %}<div class="panel"><h2>Riepiloghi</h2><ul>{% for s in summaries %}<li><a href="/confronto/{{ s._name }}">{{ s._name }}</a> · {{ s.experiments|length }} esperimenti · {{ s.split }}</li>{% endfor %}</ul></div>{% endif %}
+{% endblock %}

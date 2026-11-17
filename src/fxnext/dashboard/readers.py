@@ -1,0 +1,425 @@
+"""Read-only access to what research and data commands already wrote on disk.
+
+Nothing here writes, launches a run or touches the network. Every function takes
+explicit paths and returns plain dicts, so the web layer stays thin and the
+readers can be tested on their own.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import tomllib
+from collections import defaultdict
+from dataclasses import dataclass
+from datetime import UTC, date, datetime
+from pathlib import Path
+from typing import Any
+
+import duckdb
+
+from fxnext.research.protocol import SPLITS
+
+SPLIT_LABELS = {"development": "sviluppo", "validation": "validazione", "holdout": "holdout"}
+
+
+@dataclass(frozen=True)
+class Sources:
+    """Where the dashboard looks. All paths are read, never written."""
+
+    research: Path = Path("research")
+    prereg: tuple[Path, ...] = (Path("data/prereg"),)
+    datasets: Path = Path("data/datasets")
+    raw: tuple[Path, ...] = (Path("data/raw"),)
+    frozen: tuple[Path, ...] = ()
+    news: Path = Path("data/news")
+
+
+def _read_json(path: Path) -> dict[str, Any]:
+    data: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+    return data
+
+
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def split_of_day(day: date) -> str:
+    t = datetime(day.year, day.month, day.day, tzinfo=UTC)
+    for name, (start, end) in SPLITS.items():
+        if start <= t < end:
+            return name
+    return "outside"
+
+
+# --------------------------------------------------------------------------- experiments
+
+
+def _experiment_row(result_dir: Path, report: dict[str, Any], group: str) -> dict[str, Any]:
+    exec_x1 = (report.get("streams", {}).get("exec") or {}).get("x1") or {}
+    recon = report.get("reconciliation") or {}
+    balanced = all(bool(v.get("balanced")) for v in recon.values()) if recon else None
+    return {
+        "fingerprint": report["fingerprint"],
+        "short": report["fingerprint"][:8],
+        "experiment_id": report["experiment_id"],
+        "hypothesis": report.get("hypothesis", ""),
+        "split": report["split"],
+        "split_label": SPLIT_LABELS.get(report["split"], report["split"]),
+        "symbols": sorted((report.get("per_symbol") or {}).keys()),
+        "strategy": report.get("strategy") or {},
+        "trades": exec_x1.get("trades"),
+        "expectancy": exec_x1.get("expectancy"),
+        "ci": (exec_x1.get("ci_low"), exec_x1.get("ci_high")),
+        "outcome": (report.get("criteria") or {}).get("outcome"),
+        "balanced": balanced,
+        "provenance": report.get("provenance"),
+        "code_version": (report.get("versions") or {}).get("code_version", ""),
+        "prereg_sha256": report.get("prereg_sha256", ""),
+        "group": group,
+        "path": str(result_dir),
+        "mtime": result_dir.joinpath("report.json").stat().st_mtime,
+    }
+
+
+def list_experiments(research_root: Path) -> list[dict[str, Any]]:
+    """Every ``report.json`` up to one level of grouping (e.g. ``research/check/<fp>``).
+
+    Holdout reports are listed with their identity only: their numbers are not
+    returned, so no page can show them by accident.
+    """
+
+    rows: list[dict[str, Any]] = []
+    if not research_root.is_dir():
+        return rows
+    candidates: list[tuple[Path, str]] = []
+    for child in sorted(research_root.iterdir()):
+        if not child.is_dir():
+            continue
+        if (child / "report.json").is_file():
+            candidates.append((child, ""))
+        else:
+            for sub in sorted(child.iterdir()):
+                if sub.is_dir() and (sub / "report.json").is_file():
+                    candidates.append((sub, child.name))
+    for result_dir, group in candidates:
+        try:
+            report = _read_json(result_dir / "report.json")
+        except (OSError, ValueError, KeyError):
+            continue
+        row = _experiment_row(result_dir, report, group)
+        if row["split"] == "holdout":
+            row.update(trades=None, expectancy=None, ci=(None, None), outcome="SEALED")
+        rows.append(row)
+    rows.sort(key=lambda r: (r["group"] != "", r["experiment_id"], -r["mtime"]))
+    return rows
+
+
+def find_experiment(research_root: Path, fingerprint: str) -> tuple[Path, dict[str, Any]] | None:
+    """Locate a result directory by full fingerprint or unique prefix (>= 8 chars)."""
+
+    if len(fingerprint) < 8 or not all(c in "0123456789abcdef" for c in fingerprint):
+        return None
+    matches = [
+        r for r in list_experiments(research_root) if r["fingerprint"].startswith(fingerprint)
+    ]
+    if len(matches) != 1:
+        return None
+    result_dir = Path(matches[0]["path"])
+    report = _read_json(result_dir / "report.json")
+    if report.get("split") == "holdout":
+        return None
+    return result_dir, report
+
+
+def equity_curve(result_dir: Path, stream: str = "exec", variant: str = "x1") -> dict[str, Any]:
+    """Cumulative R trade by trade, in exit order, for one stream of one experiment."""
+
+    path = result_dir / "outcomes.parquet"
+    if not path.is_file():
+        return {"points": [], "symbols": []}
+    con = duckdb.connect(":memory:")
+    try:
+        rows = con.execute(
+            "SELECT exit_ns, r_net, symbol, reason, direction FROM read_parquet(?) "
+            "WHERE stream = ? AND variant = ? AND r_net IS NOT NULL ORDER BY exit_ns, outcome_id",
+            [str(path), stream, variant],
+        ).fetchall()
+    finally:
+        con.close()
+    points: list[tuple[int, float]] = []
+    total = 0.0
+    reasons: dict[str, int] = defaultdict(int)
+    for exit_ns, r_net, _symbol, reason, _direction in rows:
+        total += float(r_net)
+        points.append((int(exit_ns), total))
+        reasons[str(reason)] += 1
+    return {
+        "points": points,
+        "symbols": sorted({str(r[2]) for r in rows}),
+        "reasons": dict(sorted(reasons.items())),
+        "trades": len(rows),
+    }
+
+
+def recent_trades(
+    result_dir: Path, limit: int = 50, stream: str = "exec", variant: str = "x1"
+) -> list[dict[str, Any]]:
+    path = result_dir / "outcomes.parquet"
+    if not path.is_file():
+        return []
+    con = duckdb.connect(":memory:")
+    try:
+        cur = con.execute(
+            "SELECT symbol, direction, entry_ns, exit_ns, reason, r_gross, r_net, mae_r, mfe_r "
+            "FROM read_parquet(?) WHERE stream = ? AND variant = ? AND r_net IS NOT NULL "
+            "ORDER BY exit_ns DESC LIMIT ?",
+            [str(path), stream, variant, limit],
+        )
+        cols = [d[0] for d in cur.description]
+        return [dict(zip(cols, row, strict=True)) for row in cur.fetchall()]
+    finally:
+        con.close()
+
+
+# --------------------------------------------------------------------------- summaries
+
+
+def list_summaries(research_root: Path) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    if not research_root.is_dir():
+        return out
+    for path in sorted(research_root.rglob("summary.json")):
+        if len(path.relative_to(research_root).parts) > 3:
+            continue
+        try:
+            s = _read_json(path)
+        except (OSError, ValueError):
+            continue
+        if s.get("split") == "holdout":
+            continue
+        s["_name"] = str(path.parent.relative_to(research_root)).replace("\\", "/")
+        s["_depth"] = len(path.relative_to(research_root).parts)
+        s["_mtime"] = path.stat().st_mtime
+        out.append(s)
+    # top-level summaries first (nested ones are checks), newest first
+    out.sort(key=lambda x: (x["_depth"], -x["_mtime"]))
+    return out
+
+
+def find_summary(research_root: Path, name: str) -> dict[str, Any] | None:
+    for s in list_summaries(research_root):
+        if s["_name"] == name:
+            return s
+    return None
+
+
+# --------------------------------------------------------------------------- pre-registrations
+
+
+def list_preregistrations(
+    prereg_dirs: tuple[Path, ...], experiments: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """TOML pre-registrations with their current sha256, matched to executed reports.
+
+    A report whose ``prereg_sha256`` differs from today's file means the file
+    changed after the run: that is flagged, never silently accepted.
+    """
+
+    by_id: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for e in experiments:
+        by_id[e["experiment_id"]].append(e)
+    out: list[dict[str, Any]] = []
+    for d in prereg_dirs:
+        if not d.is_dir():
+            continue
+        for path in sorted(d.glob("*.toml")):
+            sha = sha256_file(path)
+            try:
+                doc = tomllib.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                out.append({"file": path.name, "sha256": sha, "error": str(exc), "status": "ERROR"})
+                continue
+            exp_id = str(doc.get("experiment_id", path.stem))
+            runs = by_id.get(exp_id, [])
+            primary = [r for r in runs if not r["group"]]
+            if not runs:
+                status = "NOT_RUN"
+            elif all(r["prereg_sha256"] == sha for r in primary or runs):
+                status = "RUN"
+            else:
+                status = "CHANGED"
+            out.append(
+                {
+                    "file": path.name,
+                    "dir": str(d),
+                    "experiment_id": exp_id,
+                    "hypothesis": doc.get("hypothesis", ""),
+                    "split": doc.get("split", ""),
+                    "split_label": SPLIT_LABELS.get(
+                        str(doc.get("split", "")), doc.get("split", "")
+                    ),
+                    "symbols": [
+                        x.get("symbol") for x in doc.get("data", []) if isinstance(x, dict)
+                    ],
+                    "sha256": sha,
+                    "status": status,
+                    "runs": [r["short"] for r in runs],
+                }
+            )
+    return out
+
+
+def frozen_documents(paths: tuple[Path, ...]) -> list[dict[str, Any]]:
+    """Frozen reference documents with a ``<file>.sha256`` next to them."""
+
+    out: list[dict[str, Any]] = []
+    for d in paths:
+        if not d.is_dir():
+            continue
+        for sidecar in sorted(d.glob("*.sha256")):
+            target = sidecar.with_suffix("")
+            expected = (
+                sidecar.read_text(encoding="utf-8").split()[0] if sidecar.stat().st_size else ""
+            )
+            actual = sha256_file(target) if target.is_file() else ""
+            out.append(
+                {
+                    "file": target.name,
+                    "expected": expected,
+                    "actual": actual,
+                    "ok": bool(actual) and actual == expected,
+                }
+            )
+    return out
+
+
+# --------------------------------------------------------------------------- data coverage
+
+
+def _iter_fetch_logs(raw_roots: tuple[Path, ...]) -> list[Path]:
+    logs: list[Path] = []
+    for root in raw_roots:
+        if not root.is_dir():
+            continue
+        if (root / "fetch_log.jsonl").is_file():
+            logs.append(root / "fetch_log.jsonl")
+        for child in sorted(root.iterdir()):
+            if child.is_dir() and (child / "fetch_log.jsonl").is_file():
+                logs.append(child / "fetch_log.jsonl")
+    return logs
+
+
+def data_coverage(raw_roots: tuple[Path, ...]) -> dict[str, Any]:
+    """Days per symbol, side and year, from the downloader's append-only fetch logs.
+
+    The last record for a (symbol, side, day) wins, as in the downloader. Only
+    weekdays are counted as expected days: weekend files exist but are tiny.
+    """
+
+    last: dict[tuple[str, str, str], dict[str, Any]] = {}
+    latest_fetch = ""
+    for log in _iter_fetch_logs(raw_roots):
+        with log.open(encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except ValueError:
+                    continue
+                key = (rec.get("symbol", ""), rec.get("basis", ""), rec.get("day", ""))
+                prev = last.get(key)
+                if prev is None or rec.get("fetched_at", "") >= prev.get("fetched_at", ""):
+                    last[key] = rec
+                latest_fetch = max(latest_fetch, str(rec.get("fetched_at", "")))
+    cells: dict[tuple[str, str], dict[int, dict[str, int]]] = defaultdict(
+        lambda: defaultdict(lambda: {"ok": 0, "failed": 0})
+    )
+    for (symbol, basis, day), rec in last.items():
+        try:
+            d = date.fromisoformat(day)
+        except ValueError:
+            continue
+        bucket = cells[(symbol, basis)][d.year]
+        if rec.get("status") == "OK":
+            bucket["ok"] += 1
+        else:
+            bucket["failed"] += 1
+    rows: list[dict[str, Any]] = []
+    years: set[int] = set()
+    for (symbol, basis), by_year in sorted(cells.items()):
+        years.update(by_year)
+        rows.append({"symbol": symbol, "basis": basis, "years": dict(by_year)})
+    return {"rows": rows, "years": sorted(years), "latest_fetch": latest_fetch}
+
+
+def expected_days(year: int, until: date | None = None) -> int:
+    """Calendar days in a year (the downloader fetches every day, weekends included)."""
+
+    start = date(year, 1, 1)
+    end = date(year, 12, 31)
+    if until is not None and until < end:
+        end = until
+    return max((end - start).days + 1, 0)
+
+
+def list_datasets(datasets_root: Path) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    if not datasets_root.is_dir():
+        return out
+    for d in sorted(datasets_root.iterdir()):
+        manifest = d / "manifest.json"
+        if not manifest.is_file():
+            continue
+        try:
+            m = _read_json(manifest)
+        except (OSError, ValueError):
+            continue
+        q = m.get("quality") or {}
+        out.append(
+            {
+                "dataset_id": m.get("dataset_id", d.name),
+                "symbol": m.get("symbol"),
+                "basis": m.get("basis"),
+                "timeframe": m.get("timeframe"),
+                "provenance": m.get("provenance"),
+                "rows": m.get("rows"),
+                "rejected": m.get("rejected", 0),
+                "start": _ns_to_date(m.get("coverage_start_ns")),
+                "end": _ns_to_date(m.get("coverage_end_ns")),
+                "missing": q.get("in_session_missing"),
+            }
+        )
+    out.sort(key=lambda r: (str(r["symbol"]), str(r["start"]), str(r["basis"])))
+    return out
+
+
+def _ns_to_date(ns: Any) -> str:
+    if not isinstance(ns, int):
+        return ""
+    return datetime.fromtimestamp(ns / 1e9, tz=UTC).date().isoformat()
+
+
+__all__ = [
+    "SPLIT_LABELS",
+    "Sources",
+    "data_coverage",
+    "equity_curve",
+    "expected_days",
+    "find_experiment",
+    "find_summary",
+    "frozen_documents",
+    "list_datasets",
+    "list_experiments",
+    "list_preregistrations",
+    "list_summaries",
+    "recent_trades",
+    "sha256_file",
+    "split_of_day",
+]

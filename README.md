@@ -90,3 +90,40 @@ uv run fxnext research-summary research/<fp1> research/<fp2> --out research/summ
   apertura serve `--reopen-holdout`.
 - **Interpretazione**: tutti i rendimenti sono `MODELLED` e nessun report
   dimostra un edge da solo.
+
+## App web (prime schermate)
+
+```powershell
+uv run fxnext dashboard                      # http://127.0.0.1:8765
+uv run fxnext dashboard --frozen <cartella>  # verifica anche i documenti congelati (*.sha256)
+```
+
+L'app gira sul PC e legge soltanto: `research/` (report, riepiloghi, esiti),
+`data/prereg/` (sha256 ricalcolato a ogni apertura), `data/datasets/` (manifest) e
+i registri del downloader in `data/raw/`. Non avvia run né download, non ha rotte
+che scrivono e non mostra mai i numeri dell'holdout. Le schermate operative
+(Oggi, Posizioni, Segnali, Proposte AI) sono segnaposto fino a M3/M4.
+
+Dal telefono: installa Tailscale su PC e telefono e avvia con
+`--host <IP Tailscale del PC>`; non usare `0.0.0.0` su reti che non controlli.
+
+Avvisi Telegram: crea un bot con @BotFather, imposta `FXNEXT_TELEGRAM_TOKEN` e
+`FXNEXT_TELEGRAM_CHAT_ID` sul PC e prova con `uv run fxnext notify-test`.
+
+## Archivio news e sentiment (preparazione M4)
+
+```bash
+uv run fxnext news-archive --out data/news   # uno snapshot di calendario, COT e sentiment retail
+```
+
+Ogni esecuzione aggiunge la risposta grezza di ciascuna fonte, con l'ora UTC di
+ricezione, a `data/news/<fonte>/<anno>/<giorno>.jsonl`; non riscrive mai nulla e
+salta i record identici al precedente. Fonti: calendario settimanale Forex
+Factory (feed pubblico non ufficiale), COT CFTC (Traders in Financial Futures per
+EUR, GBP, JPY), Myfxbook Community Outlook. Il sentiment richiede
+`FXNEXT_MYFXBOOK_EMAIL` e `FXNEXT_MYFXBOOK_PASSWORD` nell'ambiente; le
+credenziali non vengono salvate. Motore e ricerca non importano questo modulo
+(import-linter): i dati entrano in una strategia solo con una pre-registrazione.
+
+Esecuzione automatica ogni 30 minuti su Windows (MSYS2): `scripts/news-archive.sh`
+da Utilità di pianificazione; il registro è in `data/news/archive.log`.

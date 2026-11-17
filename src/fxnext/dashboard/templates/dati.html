@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Dati · FxAgent Next{% endblock %}
+{% block body %}
+<div class="head"><span class="crumb">Sistema · <span id="refreshed">si aggiorna ogni {{ refresh }} secondi</span></span><h1>Copertura dei dati storici</h1>
+<p class="muted">Giorni scaricati per coppia, lato e anno, letti dai registri del downloader. Questa pagina non avvia download.{% if cov.latest_fetch %} Ultimo file scaricato: {{ cov.latest_fetch[:16].replace("T", " ") }} UTC.{% endif %}</p></div>
+<div class="panel"><div class="ph"><h2>Mappa per anno</h2></div>
+<div class="legend"><span><i class="c-dev"></i>completo</span><span><i class="c-val"></i>parziale</span><span><i style="background:var(--neg-soft);border:1px solid var(--neg)"></i>giorni FAILED</span></div>
+{% if cov.rows %}<div class="tw"><table><thead><tr><th>Serie</th>{% for y in cov.years %}<th title="{{ split_of_year[y] }}">{{ y }}</th>{% endfor %}</tr></thead><tbody>
+{% for row in cov.rows %}<tr><td class="mono">{{ row.symbol }} {{ row.basis }}</td>
+{% for y in cov.years %}{% set c = row.years.get(y) %}<td>{% if not c %}<span class="muted">–</span>{% elif c.failed %}<span class="pill p-bad">{{ c.ok }}/{{ expected[y] }} · {{ c.failed }} KO</span>{% elif c.ok >= expected[y] %}<span class="pill p-ok">{{ c.ok }}</span>{% else %}<span class="pill p-wait">{{ c.ok }}/{{ expected[y] }}</span>{% endif %}</td>{% endfor %}</tr>{% endfor %}
+</tbody></table></div>
+<p class="note">Split: 2015–2020 sviluppo, 2021–2023 validazione, dal 2024 holdout. Scaricare i dati dell'holdout non apre i suoi risultati.</p>
+{% else %}<p class="muted">Nessun registro di download trovato nelle cartelle configurate.</p>{% endif %}</div>
+<div class="panel"><div class="ph"><h2>Dataset importati</h2><span class="muted">identità = hash del contenuto</span></div>
+<div class="tw"><table><thead><tr><th>Coppia</th><th>Lato</th><th>TF</th><th>Dal</th><th>Al</th><th>Righe</th><th>Mancanti</th><th>Rifiutate</th><th>Dataset</th></tr></thead><tbody>
+{% for d in datasets %}<tr><td><b>{{ d.symbol }}</b></td><td>{{ d.basis }}</td><td>{{ d.timeframe }}</td><td>{{ d.start }}</td><td>{{ d.end }}</td><td>{{ d.rows|int }}</td><td>{{ d.missing|int }}</td><td>{{ d.rejected|int }}</td><td class="mono">{{ d.dataset_id[:8] }}…</td></tr>
+{% else %}<tr><td colspan="9" class="muted">Nessun dataset.</td></tr>{% endfor %}
+</tbody></table></div></div>
+<div class="panel"><div class="ph"><h2>Archivio news e sentiment</h2><span class="muted">uno snapshot salvato solo quando cambia qualcosa</span></div>
+<div class="tw"><table><thead><tr><th>Fonte</th><th>Record</th><th>Giorni</th><th>Ultimo salvataggio (UTC)</th><th>Esito</th></tr></thead><tbody>
+{% for n in news %}<tr><td>{{ {"calendar": "Calendario economico", "cot": "COT CFTC", "sentiment": "Sentiment retail"}[n.source] }}</td><td>{{ n.records|int }}</td><td>{{ n.days|int }}</td><td>{{ n.last_received[:16].replace("T", " ") or "–" }}</td>
+<td>{% if not n.records %}<span class="pill p-na">Mai eseguito</span>{% elif n.last_status == 200 %}<span class="pill p-ok">OK</span>{% else %}<span class="pill p-bad">HTTP {{ n.last_status }}</span>{% endif %}</td></tr>{% endfor %}
+</tbody></table></div><p class="note">Si riempie con <code>uv run fxnext news-archive</code>, lanciato in automatico ogni 30 minuti.</p></div>
+{% endblock %}
