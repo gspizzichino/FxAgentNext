@@ -431,3 +431,26 @@ dello split. Il dataset e il percorso finiscono entrambi al 2021-01-01, quindi
 il taglio non cambia nulla per questo esperimento. Nel 2015 il warm-up dà 21
 valutazioni `INSUFFICIENT_HISTORY`, tutte nei primi giorni, perché prima del
 2015 non ci sono dati.
+
+## 16. Deroga a E8 per S2 (decisa 2026-11-11 e 2026-11-17)
+
+E8 resta valida per la baseline e per tutte le altre ipotesi: lo swap non entra
+nel risultato. Per la sola ipotesi S2 (`s2-dtrend-dev-001`, trend giornaliero,
+posizioni di settimane) lo swap stimato entra nel risultato netto (decisione P2
+della pre-registrazione congelata l'11/11/2026).
+
+- **Modello** (`swap-v1`, `src/fxnext/research/hyp/swap.py`): per ogni notte
+  tenuta, swap = prezzo d'ingresso × (tasso base − tasso quotata − ricarico) / 365
+  per il long, e × (tasso quotata − tasso base − ricarico) / 365 per lo short.
+- **Ricarico**: 1,0% annuo su ciascun lato, scelto da Giacomo il 2026-11-17
+  prima di qualsiasi risultato.
+- **Tassi** (`policy-rates-v1`): tassi ufficiali alle date di effetto. USD:
+  limite superiore del target dei Fed funds; EUR: tasso sui depositi BCE; GBP:
+  Bank Rate; JPY: tasso BoJ sui conti in negativo dal 16/02/2016. La tabella
+  copre solo il 2014–2020: qualsiasi altra data dà errore, così uno split diverso
+  non la può usare per sbaglio. Prima del run va confrontata con le serie
+  ufficiali (FRED DFEDTARU, ECBDFR; Bank of England; Bank of Japan).
+- **Notti**: rollover alle 17:00 di New York con la posizione aperta; quello del
+  mercoledì vale tre notti.
+- **Report**: netto con swap (è il risultato), netto senza swap, swap medio in R,
+  notti medie e totali.

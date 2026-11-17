@@ -177,6 +177,12 @@ def outcome_rows(
 
 
 def _summary(fills: list[Fill], months: float, prereg: Preregistration) -> Summary:
+    return _summary_arrays(fills, months, prereg)
+
+
+def _summary_arrays(fills: list[Fill], months: float, prereg: Any) -> Summary:
+    """Summary of the counted fills; ``prereg`` gives the bootstrap samples and seed."""
+
     counted = [f for f in fills if f.counted]
     return summarize(
         np.array([f.r_net for f in counted], dtype=np.float64),
