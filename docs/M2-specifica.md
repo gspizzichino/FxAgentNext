@@ -444,12 +444,15 @@ della pre-registrazione congelata l'11/11/2026).
   per il long, e × (tasso quotata − tasso base − ricarico) / 365 per lo short.
 - **Ricarico**: 1,0% annuo su ciascun lato, scelto da Giacomo il 2026-11-17
   prima di qualsiasi risultato.
-- **Tassi** (`policy-rates-v1`): tassi ufficiali alle date di effetto. USD:
+- **Tassi** (`policy-rates-v2`): tassi ufficiali alle date di effetto. USD:
   limite superiore del target dei Fed funds; EUR: tasso sui depositi BCE; GBP:
   Bank Rate; JPY: tasso BoJ sui conti in negativo dal 16/02/2016. La tabella
   copre solo il 2014–2020: qualsiasi altra data dà errore, così uno split diverso
-  non la può usare per sbaglio. Prima del run va confrontata con le serie
-  ufficiali (FRED DFEDTARU, ECBDFR; Bank of England; Bank of Japan).
+  non la può usare per sbaglio. Verifica del 2026-11-17, prima di qualsiasi run
+  di S2: BCE (FRED ECBDFR) e BoE (serie IUDBEDR) identiche; Fed allineata a FRED
+  DFEDTARU, che dà due date un giorno prima (2015-12-16 e 2016-12-14, ora usate);
+  BoJ non verificabile su FRED: -0,1% dal periodo di riserva del 16/02/2016,
+  annunciato il 29/01/2016.
 - **Notti**: rollover alle 17:00 di New York con la posizione aperta; quello del
   mercoledì vale tre notti.
 - **Report**: netto con swap (è il risultato), netto senza swap, swap medio in R,

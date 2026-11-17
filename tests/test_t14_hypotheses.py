@@ -437,3 +437,5 @@ def test_end_to_end_on_synthetic_paths(tmp_path: Path) -> None:
             assert set(a["checks"]) >= {"net_positive_x1", "plateau", "entry_test_best_variant"}
         if name.startswith("s0"):
             assert r["s0"]["EURUSD"]["H1"]["all"]["q4"]["status"] == "ok"
+            # weekends are skipped, not run breakers: D1 VR(5) is computable
+            assert r["s0"]["EURUSD"]["D1"]["all"]["q5"]["status"] == "ok"

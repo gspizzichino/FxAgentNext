@@ -92,8 +92,13 @@ qualsiasi risultato. Ognuna è nel codice e nei test.
     sessione finita.
 14. **Altopiano con meno di 8 varianti**: per S7 (3 varianti) servono
     ceil(5/8 × 3) = 2 varianti positive.
-15. **Tassi per lo swap di S2**: la tabella in `swap.py` va confrontata con le
-    serie ufficiali prima del run (sezione 16 della specifica M2).
+15. **Tassi per lo swap di S2**: confrontati con le serie ufficiali il
+    2026-11-17, prima del run di S2 (sezione 16 della specifica M2).
+16. **VR su D1** (correzione del 2026-11-17 dopo il primo run di S0, che non
+    cambia regole né soglie): il weekend spezzava ogni sequenza a quattro
+    rendimenti, quindi VR(5) e VR(20) non erano mai calcolabili. Ora il rendimento
+    che attraversa il weekend resta escluso, ma le somme di q giorni lo saltano,
+    come l'ora di rollover nelle barre intraday. Le celle M15 e H1 non cambiano.
 
 ## Cosa decide la soglia
 

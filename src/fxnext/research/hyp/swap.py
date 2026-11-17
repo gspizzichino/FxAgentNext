@@ -10,7 +10,10 @@ settlement over the weekend), as on most FX platforms.
 Official policy rates, as effective dates of each change (percent per year).
 Sources: Federal Reserve (target range, upper bound; FRED DFEDTARU), ECB
 (deposit facility rate; FRED ECBDFR), Bank of England (Bank Rate), Bank of Japan
-(rate on the policy-rate balances of current accounts). The table covers only
+(rate on the policy-rate balances of current accounts, -0.1% applied from the
+reserve maintenance period starting 2016-02-16, announced 2016-01-29).
+v2 (2026-11-17): Fed dates aligned to FRED DFEDTARU (2015-12-16, 2016-12-14);
+ECB and BoE checked against ECBDFR and BoE IUDBEDR, identical. The table covers only
 2014-2020: any other date raises, so a later split cannot use it by accident.
 """
 
@@ -19,14 +22,14 @@ from __future__ import annotations
 from bisect import bisect_right
 from datetime import date
 
-RATES_VERSION = "policy-rates-v1"
+RATES_VERSION = "policy-rates-v2"
 _COVERED = (date(2014, 1, 1), date(2021, 1, 1))
 
 POLICY_RATES: dict[str, tuple[tuple[date, float], ...]] = {
     "USD": (
         (date(2008, 12, 16), 0.25),
-        (date(2015, 12, 17), 0.50),
-        (date(2016, 12, 15), 0.75),
+        (date(2015, 12, 16), 0.50),
+        (date(2016, 12, 14), 0.75),
         (date(2017, 3, 16), 1.00),
         (date(2017, 6, 15), 1.25),
         (date(2017, 12, 14), 1.50),

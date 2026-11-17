@@ -48,7 +48,7 @@ class Variant(Model):
 
 class SwapModel(Model):
     version: Literal["swap-v1"] = "swap-v1"
-    rates: Literal["policy-rates-v1"] = "policy-rates-v1"
+    rates: Literal["policy-rates-v2"] = "policy-rates-v2"
     markup_pct_per_year: float  # charged on both sides; 1.0 chosen by Giacomo 2026-11-17
 
 

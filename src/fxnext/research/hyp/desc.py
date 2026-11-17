@@ -122,7 +122,8 @@ def return_table(bars: Bars, start_ns: int, end_ns: int) -> dict[str, Any]:
         "excluded_rollover": int((inside & complete & prev_complete & contiguous & roll).sum()),
         "returns": int(ok.sum()),
     }
-    return {"r": r, "ok": ok, "usable": usable, "counts": counts}
+    intact = inside & complete & prev_complete
+    return {"r": r, "ok": ok, "usable": usable, "intact": intact, "counts": counts}
 
 
 def s0_symbol(path: PricePath, start_ns: int, end_ns: int) -> dict[str, Any]:
@@ -133,8 +134,11 @@ def s0_symbol(path: PricePath, start_ns: int, end_ns: int) -> dict[str, Any]:
         r, ok = table["r"], table["ok"]
         cells: dict[str, Any] = {"counts": table["counts"]}
         # all hours: runs of returns broken by missing bars and weekends, not by the
-        # rollover hour, which is only removed (else H1 q=24 could never be formed)
-        breaks = ~(table["usable"])
+        # rollover hour, which is only removed (else H1 q=24 could never be formed).
+        # On D1 a weekend would cut every run to four returns (Tue-Fri), so VR(5) and
+        # VR(20) could never be formed: there the weekend return is removed too and
+        # the q-day sums skip it, like the rollover hour intraday.
+        breaks = ~(table["intact"] if tf == "D1" else table["usable"])
         seg_all = np.cumsum(breaks)
         rows = {"all": (r[ok], seg_all[ok])}
         if tf != "D1":
