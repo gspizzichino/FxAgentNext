@@ -3,10 +3,10 @@
 Piattaforma di ricerca quantitativa Forex, ricostruita da zero. Nessun trading
 reale è abilitato e in questa fase non esiste alcun codice broker.
 
-Stato: **M2 — simulatore e protocollo di ricerca implementati; primo report reale in attesa dei dati storici.**
+Stato: **M2 chiuso il 2026-11-17: baseline Donchian respinta in validazione (EURUSD, GBPUSD REJECTED; USDJPY INCONCLUSIVE). Holdout sigillato.**
 
 - [Specifica M0](docs/M0-specifica.md) · [Contratti](docs/contracts.md) · [ADR](docs/adr/README.md)
-- [Report M1](docs/M1-report.md) · [Specifica M2](docs/M2-specifica.md)
+- [Report M1](docs/M1-report.md) · [Specifica M2](docs/M2-specifica.md) · [Report M2](docs/M2-report.md)
 
 ## Installazione (Windows o Linux)
 
