@@ -23,3 +23,4 @@ l'accettazione si cambia solo con un nuovo ADR.
 | [0014](0014-audit-crash-safe.md) | Protocollo crash-safe per audit Parquet e checkpoint | Proposta |
 | [0015](0015-downloader-dukascopy.md) | Downloader Dukascopy con cache grezza immutabile | Proposta |
 | [0016](0016-simulatore-di-ricerca.md) | Simulatore di ricerca su percorso M1 BID/ASK | Accettata |
+| [0017](0017-motore-demo.md) | Motore sul conto demo MT5 (M3) | Proposta |

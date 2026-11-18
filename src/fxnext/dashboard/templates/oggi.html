@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Oggi · FxAgent Next{% endblock %}
+{% block body %}
+<div class="head"><span class="crumb">Ogni giorno</span><h1>Motore sul conto demo</h1>
+<p class="muted"><span id="refreshed"></span></p></div>
+{% if not demo %}
+<div class="panel"><p>Il motore demo non è ancora partito: nessun database in <code>{{ ops }}</code>.</p>
+<p class="note">Si avvia sul PC con <code>uv run fxnext demo run --config demo.toml</code>, solo dopo la prova in sola lettura.</p></div>
+{% else %}
+<div class="grid2">
+<div class="panel"><div class="ph"><h2>Salute</h2>
+{% if demo.alive %}<span class="pill p-ok">Attivo</span>{% else %}<span class="pill p-bad">Fermo</span>{% endif %}</div>
+<dl class="kv">
+<dt>Ultimo giro</dt><dd>{% if demo.age_s is none %}mai{% else %}{{ "%.0f"|format(demo.age_s) }} s fa{% endif %}</dd>
+<dt>Conto</dt><dd class="mono">{{ demo.account }}</dd>
+<dt>Orario server</dt><dd>{% if demo.offset_h is none %}non rilevato{% else %}UTC{{ "%+.2f"|format(demo.offset_h) }} h{% endif %}</dd>
+<dt>Entrate</dt><dd>{% if demo.blockers %}<span class="pill p-bad">Ferme</span>{% for b in demo.blockers %}<br>{{ b[0] }}: {{ b[1] }}{% endfor %}{% else %}<span class="pill p-ok">Attive</span>{% endif %}</dd>
+<dt>R oggi</dt><dd class="{{ demo.r_today|cls }}">{{ "%+.2f"|format(demo.r_today) }}</dd>
+<dt>R settimana</dt><dd class="{{ demo.r_week|cls }}">{{ "%+.2f"|format(demo.r_week) }}</dd>
+<dt>Trade chiusi</dt><dd>{{ demo.trade_count }}, totale {{ "%+.2f"|format(demo.total_r) }} R</dd>
+</dl></div>
+<div class="panel"><div class="ph"><h2>Comandi</h2></div>
+<p class="note">Ogni comando va in coda: il motore lo applica al prossimo giro e lo registra. Nessun comando apre o chiude trade.</p>
+<div class="btnrow">
+{% if not demo.kill %}
+<form method="post" action="/oggi/comando" onsubmit="return confirm('Fermare le nuove entrate (kill switch)?')"><input type="hidden" name="command" value="KILL_ON"><input type="hidden" name="confirm" value="si"><button class="btn dan fill">Kill switch: ferma le entrate</button></form>
+{% else %}
+<form method="post" action="/oggi/comando" onsubmit="return confirm('Riattivare le entrate?')"><input type="hidden" name="command" value="KILL_OFF"><input type="hidden" name="confirm" value="si"><button class="btn pri">Togli il kill switch</button></form>
+{% endif %}
+{% if demo.weekly %}
+<form method="post" action="/oggi/comando" onsubmit="return confirm('Riprendere dopo il limite settimanale?')"><input type="hidden" name="command" value="RESUME_WEEKLY"><input type="hidden" name="confirm" value="si"><button class="btn">Riprendi dopo il limite settimanale</button></form>
+{% endif %}
+{% if demo.suspended %}
+<form method="post" action="/oggi/comando" onsubmit="return confirm('Hai verificato il motivo della sospensione?')"><input type="hidden" name="command" value="CLEAR_SUSPENSION"><input type="hidden" name="confirm" value="si"><button class="btn">Togli la sospensione</button></form>
+{% endif %}
+</div>
+{% if demo.commands %}<h3>Ultimi comandi</h3><ul>{% for c in demo.commands[:6] %}<li>{{ c.at }} {{ c.command }} da {{ c.source }}: {{ c.result or "in attesa" }}</li>{% endfor %}</ul>{% endif %}
+</div>
+</div>
+<div class="panel"><h2>Posizioni aperte</h2><div class="tw"><table><thead><tr><th>Coppia</th><th>Direzione</th><th>Lotti</th><th>Prezzo</th><th>Stop</th><th>Target</th><th>Aperta</th><th>Uscita a tempo</th></tr></thead><tbody>
+{% for p in demo.positions %}<tr><td>{{ p.symbol }}</td><td>{{ p.direction }}</td><td>{{ p.volume }}</td><td>{{ p.open_price }}</td><td>{{ p.sl }}</td><td>{{ p.tp }}</td><td>{{ p.open_at }}</td><td>{{ p.time_exit_at }}</td></tr>
+{% else %}<tr><td colspan="8" class="muted">Nessuna posizione aperta.</td></tr>{% endfor %}
+</tbody></table></div>
+{% if demo.foreign %}<p class="note">Posizioni di altri (non toccate): {% for f in demo.foreign %}{{ f[1] }} {{ f[2] }} {{ f[3] }} (magic {{ f[4] }}){% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}</div>
+<div class="panel"><h2>Avvisi</h2><ul>{% for a in demo.alerts[:12] %}<li>{{ a.at }} <b>{{ a.level }}</b> {{ a.text }}</li>{% else %}<li class="muted">Nessun avviso.</li>{% endfor %}</ul></div>
+{% endif %}
+{% endblock %}

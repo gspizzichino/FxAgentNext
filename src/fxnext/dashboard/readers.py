@@ -33,6 +33,7 @@ class Sources:
     raw: tuple[Path, ...] = (Path("data/raw"),)
     frozen: tuple[Path, ...] = ()
     news: Path = Path("data/news")
+    ops: Path = Path("data/ops/demo.sqlite")
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -423,3 +424,100 @@ __all__ = [
     "sha256_file",
     "split_of_day",
 ]
+
+
+# --------------------------------------------------------------------------- demo engine (M3)
+
+_LIMIT_KEYS = ("kill_switch", "suspended", "weekly_block", "daily_block_until_ns", "disconnected")
+
+
+def _iso(ns: int | None) -> str:
+    if ns is None:
+        return "–"
+    return datetime.fromtimestamp(int(ns) / 1e9, tz=UTC).strftime("%d/%m %H:%M")
+
+
+def demo_view(db: Path, now: datetime) -> dict[str, Any] | None:
+    """Everything the demo pages show, read from the engine's SQLite in read-only mode."""
+
+    if not db.exists():
+        return None
+    from fxnext.ops.store import connect
+
+    now_ns = int(now.timestamp() * 1e9)
+    conn = connect(db, readonly=True)
+    try:
+        q = conn.execute
+        meta = {r["key"]: r["value"] for r in q("SELECT key, value FROM meta")}
+        controls = {r["key"]: dict(r) for r in q("SELECT * FROM controls")}
+        beats = {r["name"]: int(r["at_ns"]) for r in q("SELECT name, at_ns FROM heartbeats")}
+        positions = [dict(r) for r in q("SELECT * FROM positions WHERE status = 'OPEN'")]
+        trades = [dict(r) for r in q("SELECT * FROM trades ORDER BY exit_ns DESC LIMIT 200")]
+        evaluations = [
+            dict(r) for r in q("SELECT * FROM evaluations ORDER BY as_of_ns DESC LIMIT 60")
+        ]
+        intents = [dict(r) for r in q("SELECT * FROM intents ORDER BY created_ns DESC LIMIT 60")]
+        alerts = [dict(r) for r in q("SELECT * FROM alerts ORDER BY id DESC LIMIT 30")]
+        commands = [dict(r) for r in q("SELECT * FROM commands ORDER BY id DESC LIMIT 20")]
+    finally:
+        conn.close()
+    blockers = []
+    for key in _LIMIT_KEYS:
+        c = controls.get(key)
+        if c is None:
+            continue
+        if key == "daily_block_until_ns":
+            if int(c["value"]) > now_ns:
+                blockers.append(("limite giornaliero", f"fino al {_iso(int(c['value']))}"))
+        elif c["value"] == "on":
+            label = {
+                "kill_switch": "kill switch",
+                "suspended": "sospensione",
+                "weekly_block": "limite settimanale",
+                "disconnected": "MT5 non raggiungibile",
+            }[key]
+            blockers.append((label, c["reason"]))
+    beat = beats.get("engine")
+    age = None if beat is None else (now_ns - beat) / 1e9
+    for row in positions:
+        row["open_at"] = _iso(row["open_ns"])
+        row["time_exit_at"] = _iso(row["time_exit_ns"])
+    for row in trades:
+        row["entry_at"] = _iso(row["entry_ns"])
+        row["exit_at"] = _iso(row["exit_ns"])
+    for row in evaluations:
+        row["at"] = _iso(row["as_of_ns"])
+    for row in intents:
+        row["at"] = _iso(row["created_ns"])
+    for row in alerts:
+        row["at"] = _iso(row["at_ns"])
+    for row in commands:
+        row["at"] = _iso(row["at_ns"])
+    total_r = sum(float(t["r_net"]) for t in trades)
+    slips = [
+        float(t["entry_slippage_pips"]) for t in trades if t["entry_slippage_pips"] is not None
+    ]
+    return {
+        "alive": age is not None and age < 120,
+        "age_s": age,
+        "account": meta.get("account_binding", "–"),
+        "offset_h": None
+        if meta.get("server_offset_s") is None
+        else int(meta["server_offset_s"]) / 3600,
+        "blockers": blockers,
+        "kill": controls.get("kill_switch", {}).get("value") == "on",
+        "weekly": controls.get("weekly_block", {}).get("value") == "on",
+        "suspended": controls.get("suspended", {}).get("value") == "on",
+        "r_today": float(meta.get("r_today", 0) or 0),
+        "r_week": float(meta.get("r_week", 0) or 0),
+        "positions": positions,
+        "foreign": json.loads(meta.get("foreign_positions", "[]") or "[]"),
+        "trades": trades,
+        "trade_count": len(trades),
+        "total_r": total_r,
+        "mean_slippage": (sum(slips) / len(slips)) if slips else None,
+        "evaluations": evaluations,
+        "intents": intents,
+        "alerts": alerts,
+        "commands": commands,
+    }
