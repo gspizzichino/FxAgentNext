@@ -47,10 +47,19 @@
 {% if ai %}
 <div class="panel"><div class="ph"><h2>Contesto AI</h2><span class="pill">Solo osservazione</span></div>
 <p class="note">Giudizi dell'AI in ombra: il motore non li legge e non decide nulla con questi. Si verificano tra 6 e 12 mesi con criteri congelati.</p>
-{% if ai.views %}<div class="tw"><table><thead><tr><th>Valuta</th><th>Tono BC</th><th>Var.</th><th>Sorpresa</th><th>5 giorni</th><th>Rischio 24h</th><th>Fiducia</th><th>Quando</th></tr></thead><tbody>
-{% for v in ai.views %}<tr><td>{{ v.currency }}</td><td>{{ "%+d"|format(v.tone) }}</td><td>{% if v.tone_change is none %}–{% else %}{{ "%+d"|format(v.tone_change) }}{% endif %}</td><td>{% if v.surprise is none %}–{% else %}{{ "%+d"|format(v.surprise) }}{% endif %}</td><td>{{ v.arrow }}</td><td>{{ v.event_risk_24h }}</td><td>{{ "%.1f"|format(v.confidence) }}</td><td>{{ v.at }} ({{ v.kind }})</td></tr>
-<tr><td></td><td colspan="7" class="muted">{{ v.rationale }}</td></tr>{% endfor %}
-</tbody></table></div>
+{% if ai.views %}<div class="aicards">
+{% for v in ai.views %}<div class="aicard">
+<div class="top"><span class="ccy">{{ v.currency }}</span><span class="muted">{{ v.at }}, {{ v.kind }}</span></div>
+<dl class="facts">
+<dt>Tono {{ v.bank }}</dt><dd>{{ v.tone_label }}{% if v.change_label %} <span class="muted">· {{ v.change_label }}</span>{% endif %}</dd>
+{% if v.surprise_label %}<dt>Sorpresa</dt><dd>{{ v.surprise_label }}</dd>{% endif %}
+<dt>Prossimi 5 giorni</dt><dd>{{ v.arrow }}</dd>
+<dt>Fiducia</dt><dd>{{ v.confidence_label }}</dd>
+<dt>Rischio 24 ore</dt><dd><span class="pill {{ v.risk_pill }}">{{ v.event_risk_24h }}</span></dd>
+</dl>
+<p class="why">{{ v.rationale }}</p>
+</div>{% endfor %}
+</div>
 {% elif ai.any %}<p class="muted">Nessun giudizio riuscito finora: vedi le ultime esecuzioni.</p>
 {% else %}<p class="muted">L'AI in ombra non ha ancora scritto nulla. Si avvia sul PC con <code>fxnext ai daily</code>.</p>{% endif %}
 {% if ai.recent %}<h3>Ultime esecuzioni</h3><ul>{% for r in ai.recent %}<li>{{ r.at }} {{ r.kind }}: {{ r.status }}{% if r.error %} ({{ r.error }}){% endif %}, {{ "%.3f"|format(r.cost) }} $</li>{% endfor %}</ul>{% endif %}

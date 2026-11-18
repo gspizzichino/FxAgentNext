@@ -209,7 +209,9 @@ def test_daily_once_on_weekdays(news: Path, tmp_path: Path) -> None:
     assert run_daily(news, st, judge, lambda: T0 + timedelta(hours=3), sent.append) is None
     saturday = datetime(2026, 11, 21, 6, 30, tzinfo=UTC)
     assert run_daily(news, st, judge, lambda: saturday, sent.append) is None
-    assert len(sent) == 1 and sent[0].startswith("AI in ombra") and "EUR: tono +0" in sent[0]
+    assert (
+        len(sent) == 1 and sent[0].startswith("AI in ombra") and "EUR → · BCE neutrale" in sent[0]
+    )
 
 
 def test_event_runs_once_per_decision_and_alerts_on_big_surprise(
@@ -337,6 +339,25 @@ def test_dashboard_shows_ai_context(news: Path, tmp_path: Path) -> None:
     run_once("daily", news, st, FakeJudge([_all(2)]), lambda: datetime.now(UTC))
     app = create_app(Sources(ai=tmp_path / "ai", ops=tmp_path / "none.sqlite"))
     html = TestClient(app).get("/oggi").text
-    assert "Contesto AI" in html and "Solo osservazione" in html and "+2" in html
+    assert "Contesto AI" in html and "Solo osservazione" in html and "molto falco (+2)" in html
     empty = create_app(Sources(ai=tmp_path / "nothing", ops=tmp_path / "none.sqlite"))
     assert "non ha ancora scritto nulla" in TestClient(empty).get("/oggi").text
+
+
+def test_cli_writes_utf8_even_on_a_cp1252_stream(
+    news: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import io
+    import sys
+
+    from fxnext.cli import main
+
+    recent = datetime.now(UTC) - timedelta(minutes=1)  # preview reads at the real time
+    _cb_text(news, "boj", "JPY", "Statement on Monetary Policy ¥ — 日本銀行", recent, True)
+    raw = io.BytesIO()
+    out = io.TextIOWrapper(raw, encoding="cp1252")
+    monkeypatch.setattr(sys, "stdout", out)
+    args = ["ai", "preview", "--news", str(news), "--out", str(tmp_path / "ai")]
+    assert main(args) == 0
+    out.flush()
+    assert "日本銀行".encode() in raw.getvalue()

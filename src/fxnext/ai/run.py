@@ -28,6 +28,8 @@ LOCAL_TZ = ZoneInfo("Europe/Rome")
 CAP_USD = 10.0
 EVENT_WINDOW = timedelta(hours=36)
 ARROW = {-1: "↓", 0: "→", 1: "↑"}
+BANK = {"USD": "Fed", "EUR": "BCE", "GBP": "BoE", "JPY": "BoJ"}
+TONE = {-2: "molto colomba", -1: "colomba", 0: "neutrale", 1: "falco", 2: "molto falco"}
 
 Notify = Callable[[str], None]
 
@@ -166,11 +168,13 @@ def digest_text(result: RunResult) -> str:
     rec = result.record
     if result.status != "ok":
         return f"AI in ombra: giudizio del mattino non scritto ({result.status}). {result.message}"
-    lines = ["AI in ombra (solo osservazione, il motore non la usa):"]
+    lines = ["AI in ombra, giudizio del mattino (solo osservazione, il motore non lo usa)"]
     for v in rec.get("judgements", []):
+        conf = v["confidence"]
+        conf_word = "bassa" if conf < 0.34 else "media" if conf < 0.67 else "alta"
         lines.append(
-            f"{v['currency']}: tono {v['tone']:+d}, 5 giorni {ARROW[v['bias_5d']]}, "
-            f"rischio 24h {v['event_risk_24h']}, fiducia {v['confidence']:.1f}"
+            f"\n{v['currency']} {ARROW[v['bias_5d']]} · {BANK[v['currency']]} "
+            f"{TONE[v['tone']]} · rischio 24h {v['event_risk_24h']} · fiducia {conf_word}"
         )
     return "\n".join(lines)
 
