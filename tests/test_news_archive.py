@@ -66,7 +66,8 @@ def _records(root: Path, source: str) -> list[dict[str, object]]:
 def test_archive_saves_then_skips_unchanged_then_saves_revision(tmp_path: Path) -> None:
     web = FakeWeb()
     now = _clock(datetime(2026, 11, 16, 18, 0, tzinfo=UTC))
-    assert na.archive_once(tmp_path, get=web, env=ENV, now=now) == {
+    three = ("calendar", "cot", "sentiment")
+    assert na.archive_once(tmp_path, three, get=web, env=ENV, now=now) == {
         "calendar": "saved",
         "cot": "saved",
         "sentiment": "saved",

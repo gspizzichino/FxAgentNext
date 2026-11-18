@@ -1,4 +1,4 @@
-"""Point-in-time archive of calendar, COT and retail sentiment snapshots.
+"""Point-in-time archive of calendar, COT, retail sentiment and central bank texts.
 
 Every run fetches each source once and appends the raw answer, with the UTC
 time it was received, to ``<root>/<source>/<YYYY>/<YYYY-MM-DD>.jsonl``. Nothing
@@ -168,7 +168,9 @@ def store(root: Path, snap: Snapshot, received_at: datetime) -> bool:
     return True
 
 
-SOURCES = ("calendar", "cot", "sentiment")
+SOURCES = ("calendar", "cot", "sentiment", "centralbanks")
+# folders shown on the data page (central banks: one feed per bank plus the texts)
+STATUS_FOLDERS = ("calendar", "cot", "sentiment", "cb-text")
 
 
 def archive_once(
@@ -191,6 +193,12 @@ def archive_once(
                 snap = fetch_cot(get)
             elif name == "sentiment":
                 snap = fetch_sentiment(get, env)
+            elif name == "centralbanks":
+                from fxnext.news.centralbanks import archive_banks
+
+                for code, outcome in archive_banks(root, get, now).items():
+                    result[f"centralbanks/{code}"] = outcome
+                continue
             else:
                 raise SourceError("fonte sconosciuta")
             saved = store(root, snap, now())
@@ -207,7 +215,7 @@ def archive_status(root: Path) -> list[dict[str, Any]]:
     """Last record and record count per source, for the web app."""
 
     out: list[dict[str, Any]] = []
-    for name in SOURCES:
+    for name in STATUS_FOLDERS:
         folder = root / name
         files = sorted(folder.glob("*/*.jsonl")) if folder.is_dir() else []
         count, last = 0, None

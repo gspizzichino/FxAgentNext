@@ -14,6 +14,10 @@ dependencies = [
     "uvicorn>=0.32",
 ]
 
+[project.optional-dependencies]
+# shadow AI (ADR-0018): only on the PC that runs `fxnext ai`
+ai = ["anthropic>=2.0,<2.5"]
+
 [project.scripts]
 fxnext = "fxnext.cli:main"
 
@@ -57,7 +61,7 @@ plugins = ["pydantic.mypy"]
 files = ["src/fxnext"]
 
 [[tool.mypy.overrides]]
-module = ["pyarrow.*", "duckdb.*"]
+module = ["pyarrow.*", "duckdb.*", "anthropic", "anthropic.*"]
 ignore_missing_imports = true
 
 [tool.importlinter]
@@ -131,3 +135,21 @@ name = "Motore e ricerca non usano l'archivio news (entra solo con una pre-regis
 type = "forbidden"
 source_modules = ["fxnext.domain", "fxnext.strategy", "fxnext.data", "fxnext.replay", "fxnext.audit", "fxnext.research"]
 forbidden_modules = ["fxnext.news"]
+
+[[tool.importlinter.contracts]]
+name = "AI in ombra: motore, strategia, ricerca e stato operativo non importano fxnext.ai (ADR-0018)"
+type = "forbidden"
+source_modules = ["fxnext.domain", "fxnext.strategy", "fxnext.data", "fxnext.replay", "fxnext.audit", "fxnext.research", "fxnext.execution", "fxnext.ops", "fxnext.news"]
+forbidden_modules = ["fxnext.ai"]
+
+[[tool.importlinter.contracts]]
+name = "AI in ombra: non tocca motore, broker, strategia ne' ricerca (solo Telegram da ops)"
+type = "forbidden"
+source_modules = ["fxnext.ai"]
+forbidden_modules = ["fxnext.execution", "fxnext.strategy", "fxnext.research", "fxnext.replay", "fxnext.ops.store", "fxnext.ops.models", "fxnext.dashboard"]
+
+[[tool.importlinter.contracts]]
+name = "La app web legge l'archivio AI dai file, senza importare fxnext.ai"
+type = "forbidden"
+source_modules = ["fxnext.dashboard"]
+forbidden_modules = ["fxnext.ai"]
