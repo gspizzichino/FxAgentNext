@@ -1,0 +1,519 @@
+{
+ "account": {
+  "currency": "EUR",
+  "leverage": 30,
+  "margin_mode": "retail_hedging",
+  "server": "NagaMarkets-Demo",
+  "trade_mode": "demo"
+ },
+ "commission": {
+  "commission_pips_per_side": 0.0,
+  "commission_total": 0.0,
+  "deals": 83,
+  "fee_total": 0.0,
+  "from": "2026-10-07 16:38:33",
+  "to": "2026-10-09 18:47:23"
+ },
+ "historical_spread": {
+  "period": "2015-01-01 to 2023-12-31, trade-server clock",
+  "symbols": {
+   "EURUSD": {
+    "by_year": {
+     "2019": {
+      "bars": 40817,
+      "median": 18.0,
+      "p75": 18.0,
+      "p95": 18.0,
+      "zero_share": 0.0
+     },
+     "2020": {
+      "bars": 371510,
+      "median": 1.0,
+      "p75": 18.0,
+      "p95": 18.0,
+      "zero_share": 0.40806
+     },
+     "2021": {
+      "bars": 373308,
+      "median": 10.0,
+      "p75": 10.0,
+      "p95": 16.0,
+      "zero_share": 0.14928
+     },
+     "2022": {
+      "bars": 370712,
+      "median": 10.0,
+      "p75": 12.0,
+      "p95": 24.0,
+      "zero_share": 0.0
+     },
+     "2023": {
+      "bars": 368854,
+      "median": 12.0,
+      "p75": 12.0,
+      "p95": 17.0,
+      "zero_share": 0.0
+     }
+    },
+    "first_bar": "2019-11-19 13:11:00",
+    "median_by_server_hour": {
+     "0": 18.0,
+     "1": 12.0,
+     "2": 11.0,
+     "3": 10.0,
+     "4": 10.0,
+     "5": 10.0,
+     "6": 10.0,
+     "7": 10.0,
+     "8": 10.0,
+     "9": 10.0,
+     "10": 10.0,
+     "11": 10.0,
+     "12": 10.0,
+     "13": 10.0,
+     "14": 10.0,
+     "15": 10.0,
+     "16": 10.0,
+     "17": 10.0,
+     "18": 10.0,
+     "19": 10.0,
+     "20": 10.0,
+     "21": 10.0,
+     "22": 10.0,
+     "23": 12.0
+    }
+   },
+   "GBPUSD": {
+    "by_year": {
+     "2015": {
+      "bars": 370876,
+      "median": 13.0,
+      "p75": 16.0,
+      "p95": 23.0,
+      "zero_share": 0.0
+     },
+     "2016": {
+      "bars": 373110,
+      "median": 13.0,
+      "p75": 16.0,
+      "p95": 24.0,
+      "zero_share": 0.0
+     },
+     "2017": {
+      "bars": 370247,
+      "median": 12.0,
+      "p75": 14.0,
+      "p95": 33.0,
+      "zero_share": 0.0
+     },
+     "2018": {
+      "bars": 371927,
+      "median": 8.0,
+      "p75": 12.0,
+      "p95": 18.0,
+      "zero_share": 0.0
+     },
+     "2019": {
+      "bars": 368659,
+      "median": 13.0,
+      "p75": 15.0,
+      "p95": 21.0,
+      "zero_share": 1e-05
+     },
+     "2020": {
+      "bars": 373609,
+      "median": 15.0,
+      "p75": 18.0,
+      "p95": 33.0,
+      "zero_share": 0.0
+     },
+     "2021": {
+      "bars": 373173,
+      "median": 14.0,
+      "p75": 17.0,
+      "p95": 34.0,
+      "zero_share": 0.00012
+     },
+     "2022": {
+      "bars": 370069,
+      "median": 17.0,
+      "p75": 20.0,
+      "p95": 54.0,
+      "zero_share": 0.0
+     },
+     "2023": {
+      "bars": 368251,
+      "median": 17.0,
+      "p75": 19.0,
+      "p95": 30.0,
+      "zero_share": 0.0
+     }
+    },
+    "first_bar": "2015-01-02 08:00:00",
+    "median_by_server_hour": {
+     "0": 19.0,
+     "1": 16.0,
+     "2": 15.0,
+     "3": 15.0,
+     "4": 15.0,
+     "5": 15.0,
+     "6": 15.0,
+     "7": 15.0,
+     "8": 14.0,
+     "9": 13.0,
+     "10": 13.0,
+     "11": 14.0,
+     "12": 13.0,
+     "13": 13.0,
+     "14": 13.0,
+     "15": 13.0,
+     "16": 13.0,
+     "17": 13.0,
+     "18": 13.0,
+     "19": 14.0,
+     "20": 14.0,
+     "21": 14.0,
+     "22": 16.0,
+     "23": 24.0
+    }
+   },
+   "USDJPY": {
+    "by_year": {
+     "2015": {
+      "bars": 370855,
+      "median": 9.0,
+      "p75": 11.0,
+      "p95": 17.0,
+      "zero_share": 0.0
+     },
+     "2016": {
+      "bars": 373328,
+      "median": 9.0,
+      "p75": 11.0,
+      "p95": 15.0,
+      "zero_share": 0.0
+     },
+     "2017": {
+      "bars": 370562,
+      "median": 9.0,
+      "p75": 10.0,
+      "p95": 50.0,
+      "zero_share": 0.0
+     },
+     "2018": {
+      "bars": 371938,
+      "median": 4.0,
+      "p75": 8.0,
+      "p95": 10.0,
+      "zero_share": 0.0
+     },
+     "2019": {
+      "bars": 368840,
+      "median": 11.0,
+      "p75": 11.0,
+      "p95": 16.0,
+      "zero_share": 0.0
+     },
+     "2020": {
+      "bars": 373576,
+      "median": 16.0,
+      "p75": 17.0,
+      "p95": 21.0,
+      "zero_share": 0.0
+     },
+     "2021": {
+      "bars": 373253,
+      "median": 16.0,
+      "p75": 17.0,
+      "p95": 26.0,
+      "zero_share": 0.0
+     },
+     "2022": {
+      "bars": 370676,
+      "median": 18.0,
+      "p75": 18.0,
+      "p95": 35.0,
+      "zero_share": 0.0
+     },
+     "2023": {
+      "bars": 368988,
+      "median": 16.0,
+      "p75": 17.0,
+      "p95": 27.0,
+      "zero_share": 0.0
+     }
+    },
+    "first_bar": "2015-01-02 08:00:00",
+    "median_by_server_hour": {
+     "0": 14.0,
+     "1": 13.0,
+     "2": 11.0,
+     "3": 11.0,
+     "4": 12.0,
+     "5": 12.0,
+     "6": 12.0,
+     "7": 12.0,
+     "8": 11.0,
+     "9": 11.0,
+     "10": 11.0,
+     "11": 11.0,
+     "12": 11.0,
+     "13": 11.0,
+     "14": 11.0,
+     "15": 11.0,
+     "16": 11.0,
+     "17": 11.0,
+     "18": 12.0,
+     "19": 12.0,
+     "20": 12.0,
+     "21": 12.0,
+     "22": 14.0,
+     "23": 18.0
+    }
+   }
+  },
+  "unit": "points"
+ },
+ "measured_utc": "2026-11-18 07:49:39",
+ "notes": [
+  "Read-only probe of the MT5 demo terminal; no orders.",
+  "reference_mid_approx: mid prices given by hand for November 2026 (not read from the terminal); they only convert swap points into percent, error of a few percent.",
+  "AUDJPY had no live tick (not in Market Watch).",
+  "EURUSD historical spread unreliable in 2019-2021 (zero spread in 41% of 2020 bars, 15% of 2021).",
+  "EURUSD^ is in the 'Forex Gold' group, the others in 'Forex Normal'.",
+  "Demo conditions: a real account may differ; swaps follow interest rates and change over time."
+ ],
+ "profile": "naga-demo-2026-11-18",
+ "symbols": {
+  "AUDJPY": {
+   "broker_symbol": "AUDJPY",
+   "contract_size": 100000.0,
+   "digits": 3,
+   "group": "Forex\\Forex Normal\\Forex Minor-Exotic",
+   "live_spread_points": [],
+   "point": 0.001,
+   "reference_mid_approx": 101.0,
+   "stops_level_points": 20,
+   "swap_long_points": 3.2,
+   "swap_mode": "points",
+   "swap_short_points": -18.5,
+   "triple_swap_day": "wednesday"
+  },
+  "AUDUSD": {
+   "broker_symbol": "AUDUSD",
+   "contract_size": 100000.0,
+   "digits": 5,
+   "group": "Forex\\Forex Normal\\Forex Major",
+   "live_spread_points": [
+    12.0,
+    12.0,
+    12.0
+   ],
+   "point": 1e-05,
+   "reference_mid_approx": 0.65,
+   "stops_level_points": 20,
+   "swap_long_points": -4.0,
+   "swap_mode": "points",
+   "swap_short_points": -1.0,
+   "triple_swap_day": "wednesday"
+  },
+  "EURCHF": {
+   "broker_symbol": "EURCHF",
+   "contract_size": 100000.0,
+   "digits": 5,
+   "group": "Forex\\Forex Normal\\Forex Major",
+   "live_spread_points": [
+    18.0,
+    18.0,
+    18.0
+   ],
+   "point": 1e-05,
+   "reference_mid_approx": 0.93,
+   "stops_level_points": 20,
+   "swap_long_points": 0.5,
+   "swap_mode": "points",
+   "swap_short_points": -11.0,
+   "triple_swap_day": "wednesday"
+  },
+  "EURGBP": {
+   "broker_symbol": "EURGBP",
+   "contract_size": 100000.0,
+   "digits": 5,
+   "group": "Forex\\Forex Normal\\Forex Major",
+   "live_spread_points": [
+    12.0,
+    12.0,
+    12.0
+   ],
+   "point": 1e-05,
+   "reference_mid_approx": 0.87,
+   "stops_level_points": 20,
+   "swap_long_points": -8.23,
+   "swap_mode": "points",
+   "swap_short_points": 0.34,
+   "triple_swap_day": "wednesday"
+  },
+  "EURJPY": {
+   "broker_symbol": "EURJPY",
+   "contract_size": 100000.0,
+   "digits": 3,
+   "group": "Forex\\Forex Normal\\Forex Major",
+   "live_spread_points": [
+    19.0,
+    19.0,
+    21.0
+   ],
+   "point": 0.001,
+   "reference_mid_approx": 180.0,
+   "stops_level_points": 20,
+   "swap_long_points": -1.0,
+   "swap_mode": "points",
+   "swap_short_points": -26.5,
+   "triple_swap_day": "wednesday"
+  },
+  "EURUSD": {
+   "broker_symbol": "EURUSD^",
+   "contract_size": 100000.0,
+   "digits": 5,
+   "group": "Forex\\Forex Gold",
+   "live_spread_points": [
+    5.0,
+    4.0,
+    5.0
+   ],
+   "point": 1e-05,
+   "reference_mid_approx": 1.16,
+   "stops_level_points": 0,
+   "swap_long_points": -10.65,
+   "swap_mode": "points",
+   "swap_short_points": 1.5,
+   "triple_swap_day": "wednesday"
+  },
+  "GBPUSD": {
+   "broker_symbol": "GBPUSD",
+   "contract_size": 100000.0,
+   "digits": 5,
+   "group": "Forex\\Forex Normal\\Forex Major",
+   "live_spread_points": [
+    11.0,
+    12.0,
+    12.0
+   ],
+   "point": 1e-05,
+   "reference_mid_approx": 1.33,
+   "stops_level_points": 20,
+   "swap_long_points": -4.5,
+   "swap_mode": "points",
+   "swap_short_points": -5.8,
+   "triple_swap_day": "wednesday"
+  },
+  "NZDUSD": {
+   "broker_symbol": "NZDUSD",
+   "contract_size": 100000.0,
+   "digits": 5,
+   "group": "Forex\\Forex Normal\\Forex Major",
+   "live_spread_points": [
+    16.0,
+    16.0,
+    17.0
+   ],
+   "point": 1e-05,
+   "reference_mid_approx": 0.57,
+   "stops_level_points": 20,
+   "swap_long_points": -4.0,
+   "swap_mode": "points",
+   "swap_short_points": 0.1,
+   "triple_swap_day": "wednesday"
+  },
+  "USDCAD": {
+   "broker_symbol": "USDCAD",
+   "contract_size": 100000.0,
+   "digits": 5,
+   "group": "Forex\\Forex Normal\\Forex Major",
+   "live_spread_points": [
+    20.0,
+    20.0,
+    22.0
+   ],
+   "point": 1e-05,
+   "reference_mid_approx": 1.4,
+   "stops_level_points": 20,
+   "swap_long_points": 1.0,
+   "swap_mode": "points",
+   "swap_short_points": -8.0,
+   "triple_swap_day": "wednesday"
+  },
+  "USDCHF": {
+   "broker_symbol": "USDCHF",
+   "contract_size": 100000.0,
+   "digits": 5,
+   "group": "Forex\\Forex Normal\\Forex Major",
+   "live_spread_points": [
+    16.0,
+    16.0,
+    16.0
+   ],
+   "point": 1e-05,
+   "reference_mid_approx": 0.8,
+   "stops_level_points": 20,
+   "swap_long_points": -0.1,
+   "swap_mode": "points",
+   "swap_short_points": -14.2,
+   "triple_swap_day": "wednesday"
+  },
+  "USDJPY": {
+   "broker_symbol": "USDJPY",
+   "contract_size": 100000.0,
+   "digits": 3,
+   "group": "Forex\\Forex Normal\\Forex Major",
+   "live_spread_points": [
+    8.0,
+    8.0,
+    9.0
+   ],
+   "point": 0.001,
+   "reference_mid_approx": 155.0,
+   "stops_level_points": 20,
+   "swap_long_points": 2.0,
+   "swap_mode": "points",
+   "swap_short_points": -23.5,
+   "triple_swap_day": "wednesday"
+  },
+  "USDNOK": {
+   "broker_symbol": "USDNOK",
+   "contract_size": 100000.0,
+   "digits": 5,
+   "group": "Forex\\Forex Normal\\Forex Minor-Exotic",
+   "live_spread_points": [
+    177.0,
+    166.0,
+    160.0
+   ],
+   "point": 1e-05,
+   "reference_mid_approx": 10.1,
+   "stops_level_points": 20,
+   "swap_long_points": -42.0,
+   "swap_mode": "points",
+   "swap_short_points": -51.0,
+   "triple_swap_day": "wednesday"
+  },
+  "USDSEK": {
+   "broker_symbol": "USDSEK",
+   "contract_size": 100000.0,
+   "digits": 5,
+   "group": "Forex\\Forex Normal\\Forex Minor-Exotic",
+   "live_spread_points": [
+    164.0,
+    158.0,
+    161.0
+   ],
+   "point": 1e-05,
+   "reference_mid_approx": 9.4,
+   "stops_level_points": 20,
+   "swap_long_points": -8.0,
+   "swap_mode": "points",
+   "swap_short_points": -80.0,
+   "triple_swap_day": "wednesday"
+  }
+ }
+}

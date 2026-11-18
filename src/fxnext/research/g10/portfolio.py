@@ -185,9 +185,12 @@ class Returns:
     markup: F64
     turnover: F64
 
+    stress_all: bool = False  # g10-cost-naga-v1: the multiplier also scales spread and markup
+
     def net(self, multiplier: float = 1.0, markup: bool = True) -> F64:
-        out = self.gross - self.spread - multiplier * self.fees
-        return out - self.markup if markup else out
+        k = multiplier if self.stress_all else 1.0
+        out = self.gross - k * self.spread - multiplier * self.fees
+        return out - k * self.markup if markup else out
 
 
 def simulate(market: Market, weights: F64, costs: G10Costs) -> Returns:
@@ -206,8 +209,12 @@ def simulate(market: Market, weights: F64, costs: G10Costs) -> Returns:
         carry=carry,
         spread=(trades * market.half_spread).sum(axis=-1),
         fees=(trades * market.fee_rel).sum(axis=-1),
-        markup=np.abs(w).sum(axis=-1) * costs.markup_pct_per_year / 100.0 * market.days / 360.0,
+        markup=(np.abs(w) * np.asarray(costs.markup_vector())).sum(axis=-1)
+        / 100.0
+        * market.days
+        / 360.0,
         turnover=trades.sum(axis=-1),
+        stress_all=costs.stress_all,
     )
 
 

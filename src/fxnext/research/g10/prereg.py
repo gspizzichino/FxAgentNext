@@ -15,6 +15,8 @@ from datetime import date
 from pathlib import Path
 from typing import Literal
 
+from pydantic import model_validator
+
 from fxnext.domain.model import Model
 from fxnext.research.protocol import ProtocolError
 
@@ -52,14 +54,46 @@ class G10Variant(Model):
 class G10Costs(Model):
     # v1: cost-model-v1 adapted (g10-cm-dev-001 §5). v2: same, but a zero spread at a
     # rebalance is replaced by the median non-zero spread of that pair (g10-cm-dev-002).
-    version: Literal["g10-cost-v1", "g10-cost-v2"] = "g10-cost-v1"
+    # naga-v1: costs measured on the broker (profile ``broker_profile``): markup per
+    # currency instead of a flat one, zero-spread fill as v2, and the stress multiplier
+    # applied to spread and markup too (lesson of g10-cm-dev-002).
+    version: Literal["g10-cost-v1", "g10-cost-v2", "g10-cost-naga-v1"] = "g10-cost-v1"
     commission_pips: float = 0.35  # per side, on traded notional
     slippage_pips: float = 0.1  # per side, on traded notional
     markup_pct_per_year: float = 1.0  # on every open position (Giacomo, 2026-11-17)
+    broker_profile: str | None = None  # naga-v1 only
+    markup_pct_by_currency: dict[str, float] | None = None  # naga-v1 only, per side
+
+    @model_validator(mode="after")
+    def _naga_fields(self) -> G10Costs:
+        naga = self.version == "g10-cost-naga-v1"
+        if naga != (self.broker_profile is not None) or naga != (
+            self.markup_pct_by_currency is not None
+        ):
+            raise ValueError("broker_profile and markup_pct_by_currency go with g10-cost-naga-v1")
+        if naga:
+            assert self.markup_pct_by_currency is not None
+            missing = set(CURRENCIES[1:]) - set(self.markup_pct_by_currency)
+            if missing or set(self.markup_pct_by_currency) - set(CURRENCIES[1:]):
+                raise ValueError(
+                    f"markup_pct_by_currency must list the 9 non-USD currencies: {missing}"
+                )
+        return self
 
     @property
     def fill_zero_spread(self) -> bool:
-        return self.version == "g10-cost-v2"
+        return self.version in ("g10-cost-v2", "g10-cost-naga-v1")
+
+    @property
+    def stress_all(self) -> bool:
+        return self.version == "g10-cost-naga-v1"
+
+    def markup_vector(self) -> tuple[float, ...]:
+        """Markup per side for each of ``CURRENCIES`` (USD is cash: zero)."""
+
+        if self.markup_pct_by_currency is None:
+            return (0.0,) + (self.markup_pct_per_year,) * (len(CURRENCIES) - 1)
+        return (0.0,) + tuple(self.markup_pct_by_currency[c] for c in CURRENCIES[1:])
 
 
 class G10Criteria(Model):

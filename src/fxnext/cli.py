@@ -138,6 +138,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--research", type=Path, default=Path("research"))
     p.add_argument("--code-version", default=None)
 
+    p = sub.add_parser("broker-costs", help="print a measured broker cost profile")
+    p.add_argument("--profile", default="naga-demo-2026-11-18")
+    p.add_argument(
+        "--price", action="append", default=[], help="PAIR=MID, overrides the approximate mid"
+    )
+
     p = sub.add_parser("verify", help="verify a run destination")
     p.add_argument("run_dir", type=Path)
 
@@ -360,6 +366,8 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
         return 0
+    if args.cmd == "broker-costs":
+        return _broker_costs(args)
     if args.cmd == "verify":
         manifest = read_manifest(args.run_dir)
         dest = AuditDestination(
@@ -403,6 +411,29 @@ def main(argv: list[str] | None = None) -> int:
         print("Messaggio inviato.")
         return 0
     return 2
+
+
+def _broker_costs(args: argparse.Namespace) -> int:
+    from fxnext.research.broker import load_profile
+
+    prices = {}
+    for item in args.price:
+        pair, _, mid = item.partition("=")
+        prices[pair.strip().upper()] = float(mid)
+    prof = load_profile(args.profile)
+    print(
+        f"{prof.name} (sha256 {prof.sha256[:16]}),"
+        f" commissione {prof.commission_pips_per_side} pip/lato"
+    )
+    print("coppia   spread pip  swap long %  swap short %  ricarico/lato %  differenziale %")
+    for r in prof.table(prices or None):
+        sp = "n/d" if r["spread_pips"] is None else f"{r['spread_pips']:.2f}"
+        print(
+            f"{r['pair']:8} {sp:>10} {r['swap_long_pct']:>12.2f} {r['swap_short_pct']:>13.2f}"
+            f" {r['markup_pct_per_side']:>16.2f} {r['implied_differential_pct']:>16.2f}"
+        )
+    print("ricarico per valuta (g10-cost-naga-v1):", prof.markup_pct_by_currency(prices or None))
+    return 0
 
 
 def _dashboard(args: argparse.Namespace) -> int:
