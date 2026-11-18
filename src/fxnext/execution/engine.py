@@ -28,7 +28,7 @@ import numpy as np
 
 from fxnext.domain.calendar import FxCalendar, ny_1700_utc
 from fxnext.domain.contracts import EMPTY_STATE, Abstention, Candidate
-from fxnext.domain.enums import Direction, Timeframe
+from fxnext.domain.enums import Direction, ReasonCode, Timeframe
 from fxnext.domain.timeutil import from_ns, to_ns
 from fxnext.execution.broker import Broker, BrokerUnavailable
 from fxnext.execution.config import DemoConfig
@@ -55,6 +55,10 @@ from fxnext.strategy.donchian import DonchianBreakout
 
 _NS = 1_000_000_000
 _H1 = Timeframe.H1.ns
+# Abstentions caused by missing candles: retried for ``data_retry_s`` before recording.
+_DATA_REASONS = frozenset(
+    {ReasonCode.BAR_NOT_AVAILABLE, ReasonCode.DATA_GAP, ReasonCode.INSUFFICIENT_HISTORY}
+)
 
 CrashHook = Callable[[str], None]
 
@@ -641,8 +645,18 @@ class DemoEngine:
                 dataset, self.calendar, self.req.timeframe, signal_open, self.req.slots_back, as_of
             )
             ev = self.strategy.evaluate(snap, self.strategy_config, EMPTY_STATE)
-            rep.evaluations += 1
             outcome = ev.outcome
+            if (
+                isinstance(outcome, Abstention)
+                and outcome.reason_code in _DATA_REASONS
+                and now_ns - as_of < self.config.data_retry_s * _NS
+            ):
+                # MT5 may still be syncing history (seen on the PC right after
+                # symbol_select): read the candles again on the next loop instead of
+                # recording a data abstention that would close the slot.
+                rep.blockers.append(f"{symbol}: candele incomplete, riprovo")
+                continue
+            rep.evaluations += 1
             dispatch = "NOT_DISPATCHED_LATE" if late else "DISPATCHED"
             with self.store.tx():
                 self.store.record_evaluation(

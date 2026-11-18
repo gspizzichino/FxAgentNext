@@ -35,6 +35,7 @@ class DemoConfig:
     max_tick_age_s: float = 60.0
     evaluation_delay_s: float = 10.0
     max_lateness_s: float = 300.0
+    data_retry_s: float = 120.0
     rollover_quiet_minutes: int = 15
     time_exit_slots: int = 120
     reconcile_tolerance_s: float = 120.0
@@ -51,6 +52,8 @@ class DemoConfig:
             raise ValueError("volume must be > 0 and <= max_volume <= 0.1 lots")
         if self.daily_limit_r >= 0 or self.weekly_limit_r >= 0:
             raise ValueError("loss limits must be negative R values")
+        if not 0 <= self.data_retry_s < self.max_lateness_s:
+            raise ValueError("data_retry_s must be >= 0 and below max_lateness_s")
         if self.max_positions_total < 1:
             raise ValueError("max_positions_total must be >= 1")
         missing = set(self.symbols) - set(self.max_spread_pips)
@@ -85,6 +88,7 @@ class DemoConfig:
             "max_tick_age_s",
             "evaluation_delay_s",
             "max_lateness_s",
+            "data_retry_s",
             "reconcile_tolerance_s",
             "loop_seconds",
         )
@@ -126,6 +130,7 @@ deviation_points = 10
 max_tick_age_s = 60
 evaluation_delay_s = 10
 max_lateness_s = 300
+data_retry_s = 120               # incomplete candles: read again for up to 2 minutes
 rollover_quiet_minutes = 15
 time_exit_slots = 120
 ops_db = "data/ops/demo.sqlite"

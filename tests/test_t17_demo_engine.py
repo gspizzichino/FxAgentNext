@@ -703,3 +703,31 @@ def test_dashboard_without_engine_db(tmp_path: Path) -> None:
     assert "non è ancora partito" in client.get("/oggi").text
     r = client.post("/oggi/comando", data={"command": "KILL_ON", "confirm": "si"})
     assert r.status_code == 409
+
+
+def test_incomplete_candles_are_read_again_before_recording(tmp_path: Path) -> None:
+    """On the PC the first read after symbol_select returned partial history."""
+
+    broker, store, engine = make(tmp_path)
+    full = broker.bars["EURUSD^"]
+    broker.bars["EURUSD^"] = full[:-1]  # last M15 of the signal hour missing
+    engine.step(to_ns(NOW))
+    assert store.conn.execute("SELECT COUNT(*) FROM evaluations").fetchone()[0] == 0
+    assert broker.sent == []
+    broker.bars["EURUSD^"] = full  # history synced
+    engine.step(to_ns(NOW) + 5 * _S)
+    ev = store.conn.execute("SELECT * FROM evaluations").fetchone()
+    assert ev["outcome"] == "CANDIDATE_LONG"
+    assert len(broker.sent) == 1
+
+
+def test_persistent_gap_is_recorded_after_retry_window(tmp_path: Path) -> None:
+    broker, store, engine = make(tmp_path)
+    broker.bars["EURUSD^"] = broker.bars["EURUSD^"][:-1]
+    engine.step(to_ns(NOW))
+    later = to_ns(NOW) + 150 * _S
+    broker.set_tick("EURUSD^", later - _S, 1.1032, 1.10328)
+    engine.step(later)
+    ev = store.conn.execute("SELECT * FROM evaluations").fetchone()
+    assert ev["outcome"] == "BAR_NOT_AVAILABLE"
+    assert broker.sent == []
