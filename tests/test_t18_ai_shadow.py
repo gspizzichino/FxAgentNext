@@ -33,12 +33,20 @@ def _put(root: Path, source: str, body: Any, at: datetime, url: str = "u") -> No
     store(root, Snapshot(source, url, 200, raw), at)
 
 
-def _cb_text(root: Path, bank: str, ccy: str, title: str, at: datetime, decision: bool) -> None:
+def _cb_text(
+    root: Path,
+    bank: str,
+    ccy: str,
+    title: str,
+    at: datetime,
+    decision: bool,
+    published: str | None = None,
+) -> None:
     body = {
         "bank": bank,
         "currency": ccy,
         "title": title,
-        "published": "",
+        "published": at.strftime("%a, %d %b %Y %H:%M:%S GMT") if published is None else published,
         "decision": decision,
         "text": f"{title}: the committee decided...",
     }
@@ -361,3 +369,23 @@ def test_cli_writes_utf8_even_on_a_cp1252_stream(
     assert main(args) == 0
     out.flush()
     assert "日本銀行".encode() in raw.getvalue()
+
+
+def test_old_decisions_downloaded_today_do_not_trigger(news: Path, tmp_path: Path) -> None:
+    """First archive run: a decision published weeks ago is received now. No event run."""
+
+    st = AiStore(tmp_path / "ai")
+    _cb_text(news, "fed", "USD", "FOMC statement", T0, True, "Wed, 29 Oct 2026 18:00:00 GMT")
+    _cb_text(news, "boj", "JPY", "Statement on Monetary Policy", T0, True, "")
+    judge = FakeJudge([])
+    assert run_events(news, st, judge, lambda: T0 + timedelta(minutes=5)) == []
+    assert judge.calls == []
+
+
+def test_publication_times() -> None:
+    assert ctx.published_at("Wed, 29 Oct 2026 18:00:00 GMT") == datetime(
+        2026, 10, 29, 18, tzinfo=UTC
+    )
+    assert ctx.published_at("2026-10-30T12:00:00+09:00") == datetime(2026, 10, 30, 3, tzinfo=UTC)
+    assert ctx.published_at("2026-10-30") == datetime(2026, 10, 30, tzinfo=UTC)
+    assert ctx.published_at("ieri") is None and ctx.published_at("") is None

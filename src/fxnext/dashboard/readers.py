@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import duckdb
 
@@ -432,10 +433,15 @@ __all__ = [
 _LIMIT_KEYS = ("kill_switch", "suspended", "weekly_block", "daily_block_until_ns", "disconnected")
 
 
+_ROME = ZoneInfo("Europe/Rome")
+
+
 def _iso(ns: int | None) -> str:
+    """Demo pages show Italian time, like the news page and Telegram."""
+
     if ns is None:
         return "–"
-    return datetime.fromtimestamp(int(ns) / 1e9, tz=UTC).strftime("%d/%m %H:%M")
+    return datetime.fromtimestamp(int(ns) / 1e9, tz=UTC).astimezone(_ROME).strftime("%d/%m %H:%M")
 
 
 def demo_view(db: Path, now: datetime) -> dict[str, Any] | None:
