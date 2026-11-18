@@ -178,6 +178,7 @@ def run_g10(
             for m, c in zip(market.months, market.contiguous.tolist(), strict=True)
             if not c
         ],
+        "zero_spread_filled": market.zero_spread_filled,
         "variants": {},
         "warnings": [],
     }

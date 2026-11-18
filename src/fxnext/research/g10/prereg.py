@@ -50,10 +50,16 @@ class G10Variant(Model):
 
 
 class G10Costs(Model):
-    version: Literal["g10-cost-v1"] = "g10-cost-v1"  # cost-model-v1 adapted (frozen text §5)
+    # v1: cost-model-v1 adapted (g10-cm-dev-001 §5). v2: same, but a zero spread at a
+    # rebalance is replaced by the median non-zero spread of that pair (g10-cm-dev-002).
+    version: Literal["g10-cost-v1", "g10-cost-v2"] = "g10-cost-v1"
     commission_pips: float = 0.35  # per side, on traded notional
     slippage_pips: float = 0.1  # per side, on traded notional
     markup_pct_per_year: float = 1.0  # on every open position (Giacomo, 2026-11-17)
+
+    @property
+    def fill_zero_spread(self) -> bool:
+        return self.version == "g10-cost-v2"
 
 
 class G10Criteria(Model):

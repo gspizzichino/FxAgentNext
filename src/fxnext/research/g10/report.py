@@ -47,6 +47,14 @@ def render_g10(r: dict[str, Any]) -> str:
         out.append(
             f"| {sym} | {tot['weekdays']} | {tot['valid']} | {tot['missing']} | {tot['zero_volume']} | {tot['crossed']} |"
         )
+    filled = r.get("zero_spread_filled") or {}
+    if filled:
+        out += [
+            "",
+            "Spread a zero sostituiti dalla mediana non nulla della coppia (costi v2): "
+            + ", ".join(f"{c} {n}" for c, n in filled.items())
+            + ".",
+        ]
     out += [
         "",
         "Spread mediano a fine mese (pip), per anno:",

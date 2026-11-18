@@ -10,7 +10,7 @@ month of rebalance i+1. Costs of the trades at rebalance i are charged to period
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
@@ -39,6 +39,7 @@ class Market:
     eligible: npt.NDArray[np.bool_]  # (P, NC) rate known at the opening (USD included)
     rate_at_open: F64  # (P, NC) NaN when unknown
     rebal_rows: list[int]  # row of each opening rebalance in the panel
+    zero_spread_filled: dict[str, int] = field(default_factory=dict)  # cost v2 only
 
 
 def _ccy_value(panel: Panel, ccy: str, row: int) -> float:
@@ -100,6 +101,15 @@ def build_market(
             mid = (bid + ask) / 2.0
             out.half_spread[j, c] = (ask - bid) / 2.0 / mid
             out.fee_rel[j, c] = fee_pips * pip_size(PAIRS[ccy]) / mid
+    out.zero_spread_filled = {}
+    if costs.fill_zero_spread:
+        for c in range(1, NC):
+            column = out.half_spread[:, c]
+            zero = column <= 0
+            positive = column[~zero]
+            if zero.any() and positive.size:
+                column[zero] = float(np.median(positive))
+                out.zero_spread_filled[CURRENCIES[c]] = int(zero.sum())
     if not out.eligible[:, _USD].all():
         out.eligible[~out.eligible[:, _USD], :] = False
     return out

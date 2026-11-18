@@ -388,3 +388,57 @@ def test_end_to_end_run(data: tuple[Path, Path], tmp_path: Path) -> None:
     assert again.fingerprint == res.fingerprint
     assert json.loads((res.path / "report.json").read_text())["fingerprint"] == res.fingerprint
     assert add_months((2004, 1), -1) == (2003, 12)
+
+
+def test_cost_v2_fills_zero_spreads(tmp_path: Path) -> None:
+    raw = tmp_path / "raw"
+    cache = _write_cache(raw, last_year=2005)
+    # rewrite USDSEK ASK 2004 equal to BID: zero spread every day of 2004
+    rng = np.random.Generator(np.random.PCG64(1000 + list(PAIRS.values()).index("USDSEK")))
+    price = START_PRICE["USDSEK"]
+    bid_2004: list[DayCandle] = []
+    for year in (2003, 2004):
+        candles, price = _candles("USDSEK", year, rng, price, "BID")
+        if year == 2004:
+            bid_2004 = candles
+    payload = encode_daily(bid_2004, G10_DIGITS["USDSEK"])
+    path = cache.store("USDSEK", PriceBasis.ASK, 2004, payload)
+    cache.append(
+        {
+            "symbol": "USDSEK",
+            "basis": "ASK",
+            "year": 2004,
+            "status": "OK",
+            "sha256": hashlib.sha256(payload).hexdigest(),
+            "cache_path": path.relative_to(raw).as_posix(),
+        }
+    )
+    _write_rates(tmp_path / "rates")
+    import fxnext.research.g10.panel as panel_mod
+
+    old = panel_mod.G10_SPLITS
+    try:
+        panel_mod.G10_SPLITS = {**old, "development": (date(2004, 1, 1), date(2006, 1, 1))}
+        panel = load_panel(raw, tmp_path / "rates", "development")
+    finally:
+        panel_mod.G10_SPLITS = old
+    sek = CURRENCIES.index("SEK")
+    v1 = build_market(panel, (2004, 1), (2005, 12), G10Costs(), 1)
+    v2 = build_market(panel, (2004, 1), (2005, 12), G10Costs(version="g10-cost-v2"), 1)
+    zero = v1.half_spread[:, sek] == 0
+    assert zero.sum() == 12  # openings at the ends of January..December 2004
+    assert v2.zero_spread_filled == {"SEK": 12}
+    assert np.allclose(v2.half_spread[zero, sek], np.median(v1.half_spread[~zero, sek]))
+    assert np.array_equal(v2.half_spread[~zero], v1.half_spread[~zero])
+
+
+def test_prereg_002_differs_only_in_the_zero_spread_rule() -> None:
+    one, _ = load_g10(PREREG)
+    two, _ = load_g10(PREREG.with_name("g10-cm-dev-002.toml"))
+    assert two.experiment_id == "g10-cm-dev-002"
+    assert two.frozen_text_sha256.startswith("8f9d7c3e")
+    assert two.costs.version == "g10-cost-v2" and one.costs.version == "g10-cost-v1"
+    a = one.model_dump(exclude={"experiment_id", "frozen_text", "frozen_text_sha256", "costs"})
+    b = two.model_dump(exclude={"experiment_id", "frozen_text", "frozen_text_sha256", "costs"})
+    assert a == b
+    assert one.costs.model_dump(exclude={"version"}) == two.costs.model_dump(exclude={"version"})
