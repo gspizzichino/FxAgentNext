@@ -13,6 +13,7 @@ import json
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any
 
@@ -179,16 +180,40 @@ def collect_sources(root: Path, as_of: datetime) -> list[Source]:
     return sources
 
 
+def published_at(value: str) -> datetime | None:
+    """Publication time from a feed item (RFC 822 or ISO 8601), in UTC."""
+
+    value = value.strip()
+    if not value:
+        return None
+    try:
+        at = parsedate_to_datetime(value)
+    except (TypeError, ValueError):
+        try:
+            at = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    return (at if at.tzinfo else at.replace(tzinfo=UTC)).astimezone(UTC)
+
+
 def pending_triggers(
     root: Path, as_of: datetime, done: set[str], window: timedelta
 ) -> list[Trigger]:
-    """Decision texts received in the last ``window`` that have no event run yet."""
+    """Decision texts *published* in the last ``window`` that have no event run yet.
+
+    The publication time comes from the bank's feed. The time the archive first
+    saw a text is not enough: on the first run it downloads decisions weeks old.
+    A text without a readable publication time never triggers an event run.
+    """
 
     out = []
     for at, rec in _known_at(root, "cb-text", as_of):
         cb = _cb(rec)
         sha = str(rec.get("sha256"))
-        if not cb.get("decision") or sha in done or at < as_of - window:
+        if not cb.get("decision") or sha in done:
+            continue
+        published = published_at(str(cb.get("published", "")))
+        if published is None or not as_of - window <= published <= as_of + timedelta(hours=1):
             continue
         ccy = str(cb.get("currency"))
         if ccy in CURRENCIES:
