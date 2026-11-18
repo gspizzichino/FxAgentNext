@@ -24,6 +24,7 @@ import numpy as np
 import numpy.typing as npt
 
 from fxnext.domain.hashing import content_hash
+from fxnext.research.broker import load_profile
 from fxnext.research.g10.panel import Month, Panel, load_panel, split_window
 from fxnext.research.g10.portfolio import (
     Market,
@@ -170,6 +171,7 @@ def run_g10(
             "costs": pre.costs.version,
             "code": code_version,
         },
+        "broker_profile": _broker_profile(pre),
         "inputs": {"raw_files": len(panel.raw_hashes), "rates": panel.rate_hashes},
         "data_check": quality,
         "periods": len(market.months),
@@ -364,3 +366,12 @@ def _json_default(value: Any) -> Any:
 
 
 __all__ = ["G10Result", "Panel", "run_g10", "assess", "block_bootstrap_mean_ci"]
+
+
+def _broker_profile(pre: G10Prereg) -> dict[str, str] | None:
+    """Name and sha256 of the measured cost profile (g10-cost-naga-v1), checked on load."""
+
+    if pre.costs.broker_profile is None:
+        return None
+    prof = load_profile(pre.costs.broker_profile)
+    return {"name": prof.name, "sha256": prof.sha256}
