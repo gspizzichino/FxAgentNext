@@ -1,0 +1,70 @@
+# NOT TO BE RUN: superseded by g10-cm-dev-002 (zero spreads), see docs/M5-g10.md
+# Generated from the frozen text prereg-g10-cm-dev-001-congelato-2026-11-17.md
+# (approved by Giacomo on 2026-11-17). Do not edit: a rule change is a new
+# pre-registration with a new ID.
+experiment_id = "g10-cm-dev-001"
+hypothesis = "Carry e momentum mensili su un paniere G10 (10 valute, 9 coppie contro USD)"
+kind = "g10_carry_momentum"
+frozen_text = "prereg-g10-cm-dev-001-congelato-2026-11-17.md"
+frozen_text_sha256 = "d53ef6aca38f4bfc86968cf197c22edfb3740d2180f2b9d4b78d82612c18a078"
+split = "development"
+rate_lag_months = 1
+cost_multipliers = [1.0, 1.5, 2.0]
+benchmark_repetitions = 1000
+benchmark_seed = 20261103
+bootstrap_samples = 10000
+bootstrap_block_months = 3
+bootstrap_seed = 20261104
+
+[costs]
+version = "g10-cost-v1"
+commission_pips = 0.35
+slippage_pips = 0.1
+markup_pct_per_year = 1.0
+
+[criteria]
+benchmark_percentile = 95.0
+min_positive_variants = 4
+subperiods = [[2004, 2007], [2008, 2010], [2011, 2013]]
+min_positive_subperiods = 2
+validation_stress_multiplier = 1.5
+
+[[variants]]
+name = "C2"
+signal = "carry"
+k = 2
+
+[[variants]]
+name = "C3"
+signal = "carry"
+k = 3
+
+[[variants]]
+name = "M3"
+signal = "momentum"
+k = 3
+lookback_months = 3
+
+[[variants]]
+name = "M6"
+signal = "momentum"
+k = 3
+lookback_months = 6
+
+[[variants]]
+name = "M12"
+signal = "momentum"
+k = 3
+lookback_months = 12
+
+[[variants]]
+name = "CM3"
+signal = "combined"
+k = 3
+lookback_months = 3
+
+[[variants]]
+name = "CM12"
+signal = "combined"
+k = 3
+lookback_months = 12

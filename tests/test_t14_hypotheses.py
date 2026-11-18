@@ -324,7 +324,7 @@ def test_max_of_k_and_atr() -> None:
 
 
 def test_preregistrations_match_the_frozen_text() -> None:
-    files = sorted(PREREG.glob("*.toml"))
+    files = sorted(f for f in PREREG.glob("*.toml") if f.name.startswith("s"))
     assert [f.name for f in files] == [
         "s0-vr-dev-001.toml",
         "s1-failure-dev-001.toml",

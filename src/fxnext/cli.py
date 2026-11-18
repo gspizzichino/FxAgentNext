@@ -116,6 +116,28 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--research", type=Path, default=Path("research"))
     p.add_argument("--code-version", default=None)
 
+    p = sub.add_parser("g10-download", help="daily BID+ASK candles of the 9 USD pairs (G10)")
+    p.add_argument("--cache", type=Path, default=Path("data/raw-d1"))
+    p.add_argument("--from-year", type=int, default=2003)
+    p.add_argument("--to-year", type=int, required=True)
+    p.add_argument("--symbol", action="append", help="default: all 9 pairs")
+    p.add_argument("--min-interval", type=float, default=1.0)
+
+    p = sub.add_parser("g10-rates", help="OECD 3-month rates of the 10 currencies from FRED")
+    p.add_argument("--out", type=Path, default=Path("data/rates"))
+
+    p = sub.add_parser("g10-check", help="data check of a G10 pre-registration (no results)")
+    p.add_argument("prereg", type=Path)
+    p.add_argument("--cache", type=Path, default=Path("data/raw-d1"))
+    p.add_argument("--rates", type=Path, default=Path("data/rates"))
+
+    p = sub.add_parser("g10-run", help="run a G10 carry/momentum pre-registration (M5)")
+    p.add_argument("prereg", type=Path)
+    p.add_argument("--cache", type=Path, default=Path("data/raw-d1"))
+    p.add_argument("--rates", type=Path, default=Path("data/rates"))
+    p.add_argument("--research", type=Path, default=Path("research"))
+    p.add_argument("--code-version", default=None)
+
     p = sub.add_parser("verify", help="verify a run destination")
     p.add_argument("run_dir", type=Path)
 
@@ -284,6 +306,56 @@ def main(argv: list[str] | None = None) -> int:
         print(
             json.dumps(
                 {"fingerprint": hyp.fingerprint, "path": str(hyp.path), "outcome": outcome},
+                indent=2,
+            )
+        )
+        return 0
+    if args.cmd == "g10-download":
+        from fxnext.data.daily import G10_DIGITS, DailyCache, download_daily
+
+        counts = download_daily(
+            DailyCache(args.cache),
+            args.symbol or list(G10_DIGITS),
+            [PriceBasis.BID, PriceBasis.ASK],
+            args.from_year,
+            args.to_year,
+            min_interval=args.min_interval,
+            progress=lambda r: print(
+                f"{r['symbol']} {r['basis']} {r['year']}: {r['status']}",
+                file=sys.stderr,
+                flush=True,
+            ),
+        )
+        print(json.dumps(counts, indent=2))
+        return 0 if counts["failed"] == 0 and counts["corrupt"] == 0 else 1
+    if args.cmd == "g10-rates":
+        from fxnext.data.daily import FRED_SERIES, RatesCache, download_rates
+
+        statuses = download_rates(RatesCache(args.out), list(FRED_SERIES.values()))
+        print(json.dumps(statuses, indent=2))
+        return 0 if all(s in ("OK", "SKIPPED") for s in statuses.values()) else 1
+    if args.cmd in ("g10-check", "g10-run"):
+        from fxnext.research.g10.runner import run_g10
+
+        g10 = run_g10(
+            args.prereg,
+            cache_root=args.cache,
+            rates_root=args.rates,
+            research_root=getattr(args, "research", Path("research")),
+            code_version=getattr(args, "code_version", None) or code_version(),
+            progress=lambda m: print(m, file=sys.stderr, flush=True),
+            check_only=args.cmd == "g10-check",
+        )
+        if args.cmd == "g10-check":
+            print(json.dumps(g10.report, indent=2))
+            return 0
+        print(
+            json.dumps(
+                {
+                    "fingerprint": g10.fingerprint,
+                    "path": str(g10.path),
+                    "outcome": g10.report["assessment"]["outcome"],
+                },
                 indent=2,
             )
         )
