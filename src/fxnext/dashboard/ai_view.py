@@ -13,7 +13,29 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 LOCAL_TZ = ZoneInfo("Europe/Rome")
-ARROW = {-1: "↓ più debole", 0: "→ nessuna idea", 1: "↑ più forte"}
+ARROW = {-1: "↓ più debole", 0: "→ nessuna direzione", 1: "↑ più forte"}
+BANK = {"USD": "Fed", "EUR": "BCE", "GBP": "BoE", "JPY": "BoJ"}
+TONE = {-2: "molto colomba", -1: "colomba", 0: "neutrale", 1: "falco", 2: "molto falco"}
+SURPRISE = {
+    -2: "molto più colomba delle attese",
+    -1: "più colomba delle attese",
+    0: "in linea con le attese",
+    1: "più falco delle attese",
+    2: "molto più falco delle attese",
+}
+RISK_PILL = {"basso": "p-ok", "medio": "p-wait", "alto": "p-bad"}
+
+
+def _confidence(c: float) -> str:
+    return "bassa" if c < 0.34 else "media" if c < 0.67 else "alta"
+
+
+def _change(d: Any) -> str:
+    if d is None:
+        return ""
+    if d == 0:
+        return "invariato"
+    return f"{'più falco' if d > 0 else 'più colomba'} di {abs(int(d))} rispetto a prima"
 
 
 def _runs(root: Path, max_files: int = 62) -> list[dict[str, Any]]:
@@ -47,10 +69,26 @@ def ai_context(root: Path, now: datetime | None = None) -> dict[str, Any]:
         if r.get("status") != "ok":
             continue
         for v in r.get("judgements", []):
-            latest[str(v.get("currency"))] = {
+            ccy = str(v.get("currency"))
+            tone = int(v.get("tone", 0))
+            surprise = v.get("surprise")
+            latest[ccy] = {
                 **v,
+                "bank": BANK.get(ccy, ""),
+                "tone_label": f"{TONE.get(tone, '–')} ({tone:+d})",
+                "change_label": _change(v.get("tone_change")),
+                "surprise_label": (
+                    ""
+                    if surprise is None
+                    else f"{SURPRISE.get(int(surprise), '–')} ({int(surprise):+d})"
+                ),
+                "confidence_label": f"{_confidence(float(v.get('confidence', 0)))} "
+                f"({float(v.get('confidence', 0)):.1f})",
+                "risk_pill": RISK_PILL.get(str(v.get("event_risk_24h")), "p-na"),
                 "at": _local(r.get("as_of")),
-                "kind": "dopo decisione" if r.get("kind") == "event" else "mattino",
+                "kind": "dopo una decisione"
+                if r.get("kind") == "event"
+                else "giudizio del mattino",
                 "arrow": ARROW.get(int(v.get("bias_5d", 0)), "–"),
             }
     month = now.astimezone(UTC).strftime("%Y-%m")
