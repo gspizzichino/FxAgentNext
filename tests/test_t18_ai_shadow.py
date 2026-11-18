@@ -340,3 +340,22 @@ def test_dashboard_shows_ai_context(news: Path, tmp_path: Path) -> None:
     assert "Contesto AI" in html and "Solo osservazione" in html and "+2" in html
     empty = create_app(Sources(ai=tmp_path / "nothing", ops=tmp_path / "none.sqlite"))
     assert "non ha ancora scritto nulla" in TestClient(empty).get("/oggi").text
+
+
+def test_cli_writes_utf8_even_on_a_cp1252_stream(
+    news: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import io
+    import sys
+
+    from fxnext.cli import main
+
+    recent = datetime.now(UTC) - timedelta(minutes=1)  # preview reads at the real time
+    _cb_text(news, "boj", "JPY", "Statement on Monetary Policy ¥ — 日本銀行", recent, True)
+    raw = io.BytesIO()
+    out = io.TextIOWrapper(raw, encoding="cp1252")
+    monkeypatch.setattr(sys, "stdout", out)
+    args = ["ai", "preview", "--news", str(news), "--out", str(tmp_path / "ai")]
+    assert main(args) == 0
+    out.flush()
+    assert "日本銀行".encode() in raw.getvalue()

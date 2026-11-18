@@ -53,7 +53,18 @@ def _print_progress(record: dict[str, Any]) -> None:
     )
 
 
+def _utf8_output() -> None:
+    """On Windows a redirected stdout uses cp1252 and fails on characters of the
+    central bank texts: write UTF-8 everywhere, replacing what cannot be written."""
+
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8", errors="replace")
+
+
 def main(argv: list[str] | None = None) -> int:
+    _utf8_output()
     parser = argparse.ArgumentParser(prog="fxnext")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
