@@ -68,13 +68,13 @@ include_external_packages = true
 name = "Core puro: domain non importa altri moduli fxnext"
 type = "forbidden"
 source_modules = ["fxnext.domain"]
-forbidden_modules = ["fxnext.strategy", "fxnext.data", "fxnext.replay", "fxnext.audit", "fxnext.research", "fxnext.cli"]
+forbidden_modules = ["fxnext.strategy", "fxnext.data", "fxnext.replay", "fxnext.audit", "fxnext.research", "fxnext.cli", "fxnext.execution", "fxnext.ops"]
 
 [[tool.importlinter.contracts]]
 name = "Core puro: strategy dipende solo da domain"
 type = "forbidden"
 source_modules = ["fxnext.strategy"]
-forbidden_modules = ["fxnext.data", "fxnext.replay", "fxnext.audit", "fxnext.research", "fxnext.cli"]
+forbidden_modules = ["fxnext.data", "fxnext.replay", "fxnext.audit", "fxnext.research", "fxnext.cli", "fxnext.execution", "fxnext.ops"]
 
 [[tool.importlinter.contracts]]
 name = "Core puro: niente I/O, rete, storage nel core"
@@ -109,9 +109,21 @@ forbidden_modules = [
 allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
+name = "La app web non importa il motore demo ne' l'adattatore MT5: solo lettura e coda comandi"
+type = "forbidden"
+source_modules = ["fxnext.dashboard"]
+forbidden_modules = ["fxnext.execution"]
+
+[[tool.importlinter.contracts]]
+name = "Motore demo e stato operativo non usano il simulatore di ricerca (vede il futuro)"
+type = "forbidden"
+source_modules = ["fxnext.execution", "fxnext.ops"]
+forbidden_modules = ["fxnext.research", "fxnext.replay", "fxnext.news"]
+
+[[tool.importlinter.contracts]]
 name = "Nessun modulo del motore dipende dalla app web"
 type = "forbidden"
-source_modules = ["fxnext.domain", "fxnext.strategy", "fxnext.data", "fxnext.replay", "fxnext.audit", "fxnext.research"]
+source_modules = ["fxnext.domain", "fxnext.strategy", "fxnext.data", "fxnext.replay", "fxnext.audit", "fxnext.research", "fxnext.execution", "fxnext.ops"]
 forbidden_modules = ["fxnext.dashboard", "fastapi", "starlette", "jinja2", "uvicorn"]
 
 [[tool.importlinter.contracts]]

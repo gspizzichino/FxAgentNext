@@ -183,9 +183,14 @@ def test_every_page_renders_and_nothing_on_disk_changes(tree: rd.Sources, tmp_pa
 
 
 def test_only_read_routes_exist(tree: rd.Sources) -> None:
+    """Read-only, except one route that queues a kill switch / resume command (M3)."""
+
     app = create_app(tree)
     for route in app.routes:
         if isinstance(route, APIRoute):
+            if route.path == "/oggi/comando":
+                assert route.methods == {"POST"}
+                continue
             assert route.methods <= {"GET", "HEAD"}, route.path
     client = TestClient(app)
     assert client.post("/stato").status_code == 405

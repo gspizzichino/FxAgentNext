@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Posizioni e trade · FxAgent Next{% endblock %}
+{% block body %}
+<div class="head"><span class="crumb">Ogni giorno</span><h1>Posizioni e trade sul demo</h1>
+<p class="muted">Esecuzione vera di Naga: prezzo ottenuto contro il prezzo quotato all'invio. <span id="refreshed"></span></p></div>
+{% if not demo %}<div class="panel"><p>Il motore demo non è ancora partito.</p></div>{% else %}
+<div class="panel"><dl class="kv"><dt>Trade chiusi</dt><dd>{{ demo.trade_count }}</dd><dt>Totale</dt><dd class="{{ demo.total_r|cls }}">{{ "%+.2f"|format(demo.total_r) }} R</dd>
+<dt>Slippage medio in entrata</dt><dd>{% if demo.mean_slippage is none %}–{% else %}{{ "%+.2f"|format(demo.mean_slippage) }} pip{% endif %}</dd></dl></div>
+<div class="panel"><div class="tw"><table><thead><tr><th>Coppia</th><th>Dir.</th><th>Entrata</th><th>Uscita</th><th>Motivo</th><th>Prezzo in</th><th>Prezzo out</th><th>Slippage in (pip)</th><th>Slippage out (pip)</th><th>Spread (pip)</th><th>Swap</th><th>Netto</th><th>R</th></tr></thead><tbody>
+{% for t in demo.trades %}<tr><td>{{ t.symbol }}</td><td>{{ t.direction }}</td><td>{{ t.entry_at }}</td><td>{{ t.exit_at }}</td><td>{{ t.exit_reason }}</td><td>{{ t.entry_price }}</td><td>{{ t.exit_price }}</td>
+<td>{% if t.entry_slippage_pips is none %}–{% else %}{{ "%+.2f"|format(t.entry_slippage_pips) }}{% endif %}</td>
+<td>{% if t.exit_slippage_pips is none %}–{% else %}{{ "%+.2f"|format(t.exit_slippage_pips) }}{% endif %}</td>
+<td>{% if t.spread_entry_pips is none %}–{% else %}{{ "%.1f"|format(t.spread_entry_pips) }}{% endif %}</td>
+<td>{{ "%.2f"|format(t.swap) }}</td><td>{{ "%+.2f"|format(t.profit + t.swap + t.commission) }}</td><td class="{{ t.r_net|cls }}">{{ "%+.2f"|format(t.r_net) }}</td></tr>
+{% else %}<tr><td colspan="13" class="muted">Nessun trade chiuso.</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endif %}
+{% endblock %}

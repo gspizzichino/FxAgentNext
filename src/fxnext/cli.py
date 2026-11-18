@@ -174,7 +174,17 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("notify-test", help="send a Telegram test message")
     p.add_argument("--text", default="FxAgent Next: messaggio di prova. Gli avvisi arrivano qui.")
 
+    from fxnext.execution import cli_demo
+
+    cli_demo.add_parser(sub)
+    p = sub.choices["dashboard"]
+    p.add_argument(
+        "--ops", type=Path, default=Path("data/ops/demo.sqlite"), help="demo engine database"
+    )
+
     args = parser.parse_args(argv)
+    if args.cmd == "demo":
+        return cli_demo.main(args)
     if args.cmd == "download":
         bases = [PriceBasis(b) for b in (args.basis or ["BID", "ASK"])]
         summary = download_range(
@@ -455,6 +465,7 @@ def _dashboard(args: argparse.Namespace) -> int:
         raw=tuple(args.raw or [Path("data/raw")]),
         frozen=tuple(args.frozen or []),
         news=args.news,
+        ops=args.ops,
     )
     print(f"FxAgent Next su http://{args.host}:{args.port}  (Ctrl+C per fermare)")
     uvicorn.run(create_app(sources), host=args.host, port=args.port, log_level="warning")

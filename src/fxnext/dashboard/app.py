@@ -1,10 +1,10 @@
-"""FxAgent Next web app (first slice: research screens, read-only).
+"""FxAgent Next web app: research screens and supervision of the demo engine.
 
 The app reads files that other commands wrote. It never imports the replay,
-the downloader or the experiment runner, and it registers only GET routes; both
-rules are checked by tests and import-linter. Operational commands (pause,
-stop, kill switch) arrive with M3 as requests the engine reads, not as calls
-from this process.
+the downloader, the experiment runner or the engine. Its only write is one POST
+route that appends a command (kill switch, resume) to the engine's queue; the
+engine applies it and records the result. No route opens or closes a trade.
+Both rules are checked by tests and import-linter.
 """
 
 from __future__ import annotations
@@ -12,6 +12,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -23,18 +24,27 @@ from fxnext.dashboard import readers as rd
 from fxnext.dashboard.news_view import news_page
 from fxnext.dashboard.telegram import TelegramConfig
 from fxnext.news.archive import archive_status
+from fxnext.ops.store import (
+    CMD_CLEAR_SUSPENSION,
+    CMD_KILL_OFF,
+    CMD_KILL_ON,
+    CMD_RESUME_WEEKLY,
+    enqueue_command,
+)
 from fxnext.research.protocol import SPLITS
 
 HERE = Path(__file__).parent
-REFRESH_SECONDS = 30  # pages that follow something in progress (download, later the engine)
+REFRESH_SECONDS = 30  # pages that follow something in progress (download, the engine)
+# The only commands the app can queue. None of them opens or closes a trade.
+DEMO_COMMANDS = frozenset({CMD_KILL_ON, CMD_KILL_OFF, CMD_RESUME_WEEKLY, CMD_CLEAR_SUSPENSION})
 
 NAV = [
     (
         "Ogni giorno",
         [
-            ("oggi", "Oggi", "M3"),
-            ("posizioni", "Posizioni", "M3"),
-            ("segnali", "Segnali e decisioni", "M3"),
+            ("oggi", "Oggi (demo)", ""),
+            ("posizioni", "Posizioni e trade", ""),
+            ("segnali", "Segnali e decisioni", ""),
             ("proposte", "Proposte AI", "M4"),
             ("news", "News e sentiment", ""),
         ],
@@ -51,23 +61,6 @@ NAV = [
     ("Sistema", [("dati", "Dati", ""), ("sistema", "Motore e avvisi", "")]),
 ]
 LATER = {
-    "oggi": (
-        "Oggi",
-        "M3",
-        "La pagina che apri al mattino: salute del motore, allarmi, cosa ha fatto "
-        "da solo mentre non c'eri. Arriva con M3, quando esisterà un motore da sorvegliare.",
-    ),
-    "posizioni": (
-        "Posizioni",
-        "M3",
-        "Posizioni aperte sul conto demo, broker contro modello, "
-        "protezione degli stop. Arriva con M3.",
-    ),
-    "segnali": (
-        "Segnali e decisioni",
-        "M3",
-        "Una riga per ogni valutazione del motore in tempo reale, con il motivo. Arriva con M3.",
-    ),
     "proposte": (
         "Proposte AI",
         "M4",
@@ -298,6 +291,42 @@ def create_app(sources: rd.Sources, *, today: date | None = None) -> FastAPI:
     @app.get("/sistema", response_class=HTMLResponse)
     def sistema(request: Request) -> HTMLResponse:
         return render(request, "sistema.html", "sistema", telegram=TelegramConfig.from_env())
+
+    def demo(request: Request, name: str, page: str) -> HTMLResponse:
+        view = rd.demo_view(sources.ops, datetime.now(UTC))
+        return render(request, name, page, demo=view, refresh=REFRESH_SECONDS, ops=sources.ops)
+
+    @app.get("/oggi", response_class=HTMLResponse)
+    def oggi(request: Request) -> HTMLResponse:
+        return demo(request, "oggi.html", "oggi")
+
+    @app.get("/posizioni", response_class=HTMLResponse)
+    def posizioni(request: Request) -> HTMLResponse:
+        return demo(request, "posizioni.html", "posizioni")
+
+    @app.get("/segnali", response_class=HTMLResponse)
+    def segnali(request: Request) -> HTMLResponse:
+        return demo(request, "segnali.html", "segnali")
+
+    @app.post("/oggi/comando")
+    async def comando(request: Request) -> RedirectResponse:
+        # urlencoded form parsed by hand: no extra dependency for one route
+        form = parse_qs((await request.body()).decode("utf-8", "replace"))
+        command = (form.get("command") or [""])[0]
+        confirm = (form.get("confirm") or [""])[0]
+        if command not in DEMO_COMMANDS:
+            raise HTTPException(400, "Comando non ammesso")
+        if confirm != "si":
+            raise HTTPException(400, "Serve la conferma")
+        if not sources.ops.exists():
+            raise HTTPException(409, "Il motore non è mai partito")
+        enqueue_command(
+            sources.ops,
+            command,
+            "dashboard",
+            int(datetime.now(UTC).timestamp() * 1e6) * 1000,
+        )
+        return RedirectResponse("/oggi", status_code=303)
 
     @app.get("/{section}", response_class=HTMLResponse)
     def later(request: Request, section: str) -> HTMLResponse:

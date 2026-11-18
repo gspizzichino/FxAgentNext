@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Segnali e decisioni · FxAgent Next{% endblock %}
+{% block body %}
+<div class="head"><span class="crumb">Ogni giorno</span><h1>Segnali e decisioni</h1>
+<p class="muted">Una riga per valutazione oraria e una per ogni ordine tentato, con il motivo. <span id="refreshed"></span></p></div>
+{% if not demo %}<div class="panel"><p>Il motore demo non è ancora partito.</p></div>{% else %}
+<div class="panel"><h2>Ordini</h2><div class="tw"><table><thead><tr><th>Quando</th><th>Coppia</th><th>Dir.</th><th>Stato</th><th>Codice</th><th>Risposta</th><th>Prezzo</th></tr></thead><tbody>
+{% for i in demo.intents %}<tr><td>{{ i.at }}</td><td>{{ i.symbol }}</td><td>{{ i.direction }}</td><td>{{ i.state }}</td><td>{{ i.retcode or "–" }}</td><td>{{ i.broker_comment or "–" }}</td><td>{{ i.fill_price or "–" }}</td></tr>
+{% else %}<tr><td colspan="7" class="muted">Nessun ordine.</td></tr>{% endfor %}
+</tbody></table></div></div>
+<div class="panel"><h2>Valutazioni</h2><div class="tw"><table><thead><tr><th>Barra chiusa</th><th>Coppia</th><th>Esito</th><th>Invio</th></tr></thead><tbody>
+{% for e in demo.evaluations %}<tr><td>{{ e.at }}</td><td>{{ e.symbol }}</td><td>{{ e.outcome }}</td><td>{{ e.dispatch }}</td></tr>
+{% else %}<tr><td colspan="4" class="muted">Nessuna valutazione.</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endif %}
+{% endblock %}
