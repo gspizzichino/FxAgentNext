@@ -21,6 +21,7 @@ from fastapi.templating import Jinja2Templates
 
 from fxnext.dashboard import charts
 from fxnext.dashboard import readers as rd
+from fxnext.dashboard.ai_view import ai_context
 from fxnext.dashboard.news_view import news_page
 from fxnext.dashboard.telegram import TelegramConfig
 from fxnext.news.archive import archive_status
@@ -298,7 +299,16 @@ def create_app(sources: rd.Sources, *, today: date | None = None) -> FastAPI:
 
     @app.get("/oggi", response_class=HTMLResponse)
     def oggi(request: Request) -> HTMLResponse:
-        return demo(request, "oggi.html", "oggi")
+        view = rd.demo_view(sources.ops, datetime.now(UTC))
+        return render(
+            request,
+            "oggi.html",
+            "oggi",
+            demo=view,
+            refresh=REFRESH_SECONDS,
+            ops=sources.ops,
+            ai=ai_context(sources.ai),
+        )
 
     @app.get("/posizioni", response_class=HTMLResponse)
     def posizioni(request: Request) -> HTMLResponse:

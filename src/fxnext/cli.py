@@ -166,10 +166,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--news", type=Path, default=Path("data/news"), help="news archive folder")
 
     p = sub.add_parser(
-        "news-archive", help="save one snapshot of calendar, COT and retail sentiment"
+        "news-archive", help="save calendar, COT, retail sentiment and central bank statements"
     )
     p.add_argument("--out", type=Path, default=Path("data/news"))
-    p.add_argument("--source", action="append", choices=["calendar", "cot", "sentiment"])
+    p.add_argument(
+        "--source", action="append", choices=["calendar", "cot", "sentiment", "centralbanks"]
+    )
 
     p = sub.add_parser("notify-test", help="send a Telegram test message")
     p.add_argument("--text", default="FxAgent Next: messaggio di prova. Gli avvisi arrivano qui.")
@@ -177,14 +179,20 @@ def main(argv: list[str] | None = None) -> int:
     from fxnext.execution import cli_demo
 
     cli_demo.add_parser(sub)
+    from fxnext.ai import cli_ai
+
+    cli_ai.add_parser(sub)
     p = sub.choices["dashboard"]
     p.add_argument(
         "--ops", type=Path, default=Path("data/ops/demo.sqlite"), help="demo engine database"
     )
+    p.add_argument("--ai", type=Path, default=Path("data/ai"), help="shadow AI archive")
 
     args = parser.parse_args(argv)
     if args.cmd == "demo":
         return cli_demo.main(args)
+    if args.cmd == "ai":
+        return cli_ai.main(args)
     if args.cmd == "download":
         bases = [PriceBasis(b) for b in (args.basis or ["BID", "ASK"])]
         summary = download_range(
@@ -466,6 +474,7 @@ def _dashboard(args: argparse.Namespace) -> int:
         frozen=tuple(args.frozen or []),
         news=args.news,
         ops=args.ops,
+        ai=args.ai,
     )
     print(f"FxAgent Next su http://{args.host}:{args.port}  (Ctrl+C per fermare)")
     uvicorn.run(create_app(sources), host=args.host, port=args.port, log_level="warning")

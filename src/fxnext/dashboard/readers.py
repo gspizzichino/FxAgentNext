@@ -34,6 +34,7 @@ class Sources:
     frozen: tuple[Path, ...] = ()
     news: Path = Path("data/news")
     ops: Path = Path("data/ops/demo.sqlite")
+    ai: Path = Path("data/ai")
 
 
 def _read_json(path: Path) -> dict[str, Any]:
