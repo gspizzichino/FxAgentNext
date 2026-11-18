@@ -19,6 +19,8 @@ import lzma
 import os
 import struct
 import time
+import urllib.error
+import urllib.request
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -37,7 +39,7 @@ from fxnext.domain.enums import PriceBasis
 
 DAILY_DOWNLOADER_VERSION = "dukascopy-daily-downloader-v1"
 DAILY_PARSER_VERSION = "dukascopy-bi5-day-candles-v1"
-RATES_DOWNLOADER_VERSION = "fred-csv-downloader-v1"
+RATES_DOWNLOADER_VERSION = "fred-csv-downloader-v2"
 FRED_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={series}"
 
 _RECORD = struct.Struct(">Iiiiif")
@@ -304,11 +306,26 @@ def download_daily(
     return counts
 
 
+def fred_fetcher(url: str, timeout: float) -> HttpResult:
+    """Plain urllib request: FRED does not answer the project's custom User-Agent
+    (requests time out), while it answers the standard Python one at once."""
+
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as response:  # noqa: S310
+            return HttpResult(int(response.status), response.read())
+    except urllib.error.HTTPError as error:
+        if error.code >= 500 or error.code == 429:
+            raise TransientHttpError(f"HTTP {error.code}") from error
+        return HttpResult(int(error.code), b"")
+    except (urllib.error.URLError, TimeoutError, ConnectionError) as error:
+        raise TransientHttpError(str(error)) from error
+
+
 def download_rates(
     cache: RatesCache,
     series: list[str],
     *,
-    fetcher: Fetcher = urllib_fetcher,
+    fetcher: Fetcher = fred_fetcher,
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
     max_attempts: int = 4,
     backoff_seconds: float = 2.0,
