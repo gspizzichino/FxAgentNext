@@ -480,6 +480,9 @@ def test_read_only_broker_never_sends(tmp_path: Path) -> None:
     engine.step(to_ns(NOW))
     assert broker.sent == [] and broker.open_positions == {}
     assert intents(store)[0]["state"] == IntentState.REJECTED
+    texts = [r["text"] for r in store.conn.execute("SELECT level, text FROM alerts")]
+    assert any(t.startswith("Sola lettura: il motore avrebbe aperto EURUSD") for t in texts)
+    assert not any("RIFIUTATO" in t for t in texts)
 
 
 def test_rounding_and_rollover() -> None:
