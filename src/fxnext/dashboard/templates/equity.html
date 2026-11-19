@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Equity · FxAgent Next{% endblock %}
+{% block body %}
+<div class="head"><span class="crumb">Ogni giorno</span><h1>Equity del conto demo</h1>
+<p class="muted">Orari italiani. <span id="refreshed"></span></p></div>
+{% if not eq %}<div class="panel"><p>Il motore demo non è ancora partito: nessun database in <code>{{ ops }}</code>.</p></div>{% else %}
+<div class="panel"><dl class="kv">
+<dt>Patrimonio ora</dt><dd>{{ eq.now_equity|num }} {{ eq.currency }}</dd>
+<dt>Saldo ora</dt><dd>{{ eq.now_balance|num }} {{ eq.currency }}</dd>
+<dt>Variazione dal {{ eq.first_at }}</dt><dd class="{{ eq.change|cls }}">{% if eq.change is none %}–{% else %}{{ "%+.2f"|format(eq.change) }} {{ eq.currency }}{% endif %}</dd>
+<dt>Discesa massima</dt><dd>{% if eq.max_dd is none %}–{% else %}{{ eq.max_dd|num }} {{ eq.currency }}{% endif %}</dd>
+</dl></div>
+<div class="panel"><h2>Patrimonio e saldo</h2>
+<div class="legend"><span><i style="background:var(--accent)"></i>Patrimonio (con le posizioni aperte)</span><span><i style="background:var(--muted)"></i>Saldo (solo trade chiusi)</span></div>
+{{ equity_chart }}
+<p class="note">Un punto ogni 5 minuti, letto dal motore. Comprende tutto il conto, anche eventuali posizioni di altri programmi.</p></div>
+<div class="panel"><h2>Trade chiusi del motore</h2>
+<p class="muted">{{ eq.trade_count }} trade, {{ "%+.2f"|format(eq.total_money) }} {{ eq.currency }}, {{ "%+.2f"|format(eq.total_r) }} R (al netto di swap e commissioni).</p>
+<div class="legend"><span><i style="background:var(--accent)"></i>Risultato cumulato in {{ eq.currency or "valuta del conto" }}</span></div>
+{{ money_chart }}
+<div class="legend"><span><i style="background:var(--seal)"></i>Risultato cumulato in R</span></div>
+{{ r_chart }}</div>
+{% endif %}
+{% endblock %}

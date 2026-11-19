@@ -7,8 +7,9 @@ from __future__ import annotations
 
 import math
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from html import escape
+from zoneinfo import ZoneInfo
 
 from markupsafe import Markup
 
@@ -242,3 +243,111 @@ def benchmarks(bench: dict[str, object], baseline: float, label: str) -> Markup:
 
 
 __all__ = ["benchmarks", "equity", "fmt_r", "forest", "grouped_bars"]
+
+
+_ROME = ZoneInfo("Europe/Rome")
+
+
+def _time_ticks(x0: int, x1: int) -> list[tuple[int, str]]:
+    """Midnights (or whole hours on a short span) in Italian time, at most about 8."""
+
+    span_h = (x1 - x0) / 3.6e12
+    start = datetime.fromtimestamp(x0 / 1e9, tz=_ROME).replace(tzinfo=None)
+    hourly = span_h <= 36
+    if hourly:
+        every = next((h for h in (1, 2, 3, 6, 12) if span_h / h <= 8), 12)
+        t = start.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+        step, fmt = timedelta(hours=1), "%H:%M"
+    else:
+        every = next((d for d in (1, 2, 7, 14, 28) if span_h / 24 / d <= 8), 28)
+        t = start.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+        step, fmt = timedelta(days=1), "%d/%m"
+    out = []
+    i = 0
+    while (ns := int(t.replace(tzinfo=_ROME).timestamp() * 1e9)) <= x1:
+        if (t.hour if hourly else i) % every == 0:
+            out.append((ns, t.strftime(fmt)))
+        t += step  # wall clock steps, so midnights stay midnights across DST
+        i += 1
+    return out
+
+
+def time_lines(
+    series: Sequence[tuple[str, str, Sequence[tuple[int, float]], bool]],
+    label: str,
+    unit: str = "",
+    zero: bool = False,
+) -> Markup:
+    """Lines over time: (name, color, points, step) per series; dates in Italian time."""
+
+    pts_all = [p for _, _, pts, _ in series for p in pts]
+    if not pts_all:
+        return Markup('<p class="muted">Ancora nessun dato.</p>')
+    w, h, left, right, top, bottom = 720, 240, 62, 86, 12, 26
+    x0 = min(p[0] for p in pts_all)
+    x1 = max(p[0] for p in pts_all)
+    if x1 == x0:
+        x1 = x0 + 3_600_000_000_000
+    ys = [p[1] for p in pts_all] + ([0.0] if zero else [])
+    lo_v, hi_v = min(ys), max(ys)
+    if hi_v - lo_v < 1e-9:
+        pad = max(abs(hi_v) * 0.001, 1.0)
+        lo_v, hi_v = lo_v - pad, hi_v + pad
+    ticks = _nice_ticks(lo_v, hi_v)
+    if len(ticks) > 1:
+        while ticks[-1] < hi_v - 1e-9:  # the top line must sit above the highest point
+            ticks.append(round(ticks[-1] + (ticks[1] - ticks[0]), 10))
+    lo, hi = ticks[0], ticks[-1]
+
+    def sx(v: float) -> float:
+        return left + (v - x0) / (x1 - x0) * (w - left - right)
+
+    def sy(v: float) -> float:
+        return top + (hi - v) / max(hi - lo, 1e-9) * (h - top - bottom)
+
+    def num(v: float) -> str:
+        if abs(v) >= 1000:
+            return f"{v:,.0f}".replace(",", ".")
+        return f"{v:.2f}".replace(".", ",")
+
+    body = []
+    for t in ticks:
+        body.append(
+            f'<line x1="{left}" x2="{w - right}" y1="{sy(t):.1f}" y2="{sy(t):.1f}" '
+            f'stroke="var(--line)"/><text x="{left - 6}" y="{sy(t) + 4:.1f}" '
+            f'text-anchor="end">{escape(num(t))}</text>'
+        )
+    if zero and lo < 0 < hi:
+        body.append(
+            f'<line x1="{left}" x2="{w - right}" y1="{sy(0):.1f}" y2="{sy(0):.1f}" '
+            f'stroke="var(--muted)"/>'
+        )
+    for ns, text in _time_ticks(x0, x1):
+        body.append(
+            f'<line x1="{sx(ns):.1f}" x2="{sx(ns):.1f}" y1="{top}" y2="{h - bottom}" '
+            f'stroke="var(--line)" stroke-dasharray="2 3"/>'
+            f'<text x="{sx(ns):.1f}" y="{h - 8}" text-anchor="middle">{text}</text>'
+        )
+    used: list[float] = []
+    for _name, color, pts, step in series:
+        if not pts:
+            continue
+        seq = list(pts)
+        if step:
+            stepped = [seq[0]]
+            for a, b in zip(seq, seq[1:], strict=False):
+                stepped += [(b[0], a[1]), b]
+            seq = stepped
+        line = " ".join(f"{sx(x):.1f},{sy(y):.1f}" for x, y in seq)
+        body.append(f'<polyline points="{line}" fill="none" stroke="{color}" stroke-width="1.8"/>')
+        lx, ly = sx(seq[-1][0]), sy(seq[-1][1])
+        body.append(f'<circle cx="{lx:.1f}" cy="{ly:.1f}" r="3.5" fill="{color}"/>')
+        ty = ly + 4
+        while any(abs(ty - u) < 13 for u in used):  # keep end labels apart
+            ty += 13
+        used.append(ty)
+        body.append(
+            f'<text x="{lx + 6:.1f}" y="{ty:.1f}" class="ink">'
+            f"{escape(num(seq[-1][1]))}{escape(unit)}</text>"
+        )
+    return _svg(w, h, "".join(body), label)
