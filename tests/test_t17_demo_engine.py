@@ -592,8 +592,11 @@ class FakeMT5:
     def __init__(self) -> None:
         self.result: Any = None
         self.requests: list[dict[str, Any]] = []
+        self.alive = True  # False: the terminal restarted, the old link is dead
+        self.inits = 0
 
     def initialize(self, *a: Any) -> bool:
+        self.inits += 1
         return True
 
     def shutdown(self) -> None:
@@ -603,7 +606,7 @@ class FakeMT5:
         return (-1, "x")
 
     def terminal_info(self) -> Any:
-        return SimpleNamespace(connected=True, trade_allowed=True)
+        return SimpleNamespace(connected=True, trade_allowed=True) if self.alive else None
 
     def account_info(self) -> Any:
         return SimpleNamespace(
@@ -660,6 +663,21 @@ def test_mt5_retcode_mapping(retcode: int | None, status: SendStatus) -> None:
         assert res.position_ticket == 77
     acct = b.account()
     assert acct.trade_mode is AccountTradeMode.DEMO and acct.trade_allowed
+
+
+def test_mt5_reconnects_after_terminal_restart() -> None:
+    from fxnext.execution.broker import BrokerUnavailable
+
+    fake = FakeMT5()
+    b = MT5Broker(mt5_module=fake)
+    b.account()
+    assert fake.inits == 1
+    fake.alive = False  # MT5 (or the PC) restarted
+    with pytest.raises(BrokerUnavailable):
+        b.account()
+    fake.alive = True  # terminal is back
+    assert b.account().login == 1
+    assert fake.inits == 2  # the link was initialized again, no engine restart needed
 
 
 # ---------------------------------------------------------------- dashboard pages and command route

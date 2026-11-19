@@ -7,6 +7,7 @@ no credentials pass through this code. Times are returned on the server clock.
 
 from __future__ import annotations
 
+import contextlib
 import time
 from typing import Any
 
@@ -56,7 +57,9 @@ class MT5Broker:
             self.mt5.initialize(self.terminal_path) if self.terminal_path else self.mt5.initialize()
         )
         if not ok:
-            raise BrokerUnavailable(f"initialize fallito: {self.mt5.last_error()}")
+            error = self.mt5.last_error()
+            self._reset()
+            raise BrokerUnavailable(f"initialize fallito: {error}")
         self._connected = True
 
     def shutdown(self) -> None:
@@ -64,18 +67,32 @@ class MT5Broker:
             self.mt5.shutdown()
             self._connected = False
 
+    def _reset(self) -> None:
+        """Drop the link to the terminal, so the next call initializes it again.
+
+        After MT5 restarts (or the PC does) the old link answers None forever:
+        without this the engine would stay "disconnected" until it is restarted.
+        """
+
+        with contextlib.suppress(Exception):  # the link may already be gone
+            self.mt5.shutdown()
+        self._connected = False
+
     def _ensure(self) -> None:
         if not self._connected:
             self.connect()
         info = self.mt5.terminal_info()
         if info is None or not info.connected:
+            self._reset()
             raise BrokerUnavailable("terminale non connesso al server")
 
     def _call(self, name: str, *args: Any, **kwargs: Any) -> Any:
         self._ensure()
         out = getattr(self.mt5, name)(*args, **kwargs)
         if out is None:
-            raise BrokerUnavailable(f"{name} senza risposta: {self.mt5.last_error()}")
+            error = self.mt5.last_error()
+            self._reset()
+            raise BrokerUnavailable(f"{name} senza risposta: {error}")
         return out
 
     # ------------------------------------------------------------------ Broker port
