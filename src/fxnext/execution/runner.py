@@ -13,7 +13,7 @@ from fxnext.domain.calendar import FxCalendar
 from fxnext.domain.contracts import EMPTY_STATE, Abstention
 from fxnext.domain.enums import Timeframe
 from fxnext.domain.timeutil import from_ns
-from fxnext.execution.broker import Broker
+from fxnext.execution.broker import DRY_RUN_COMMENT, Broker
 from fxnext.execution.config import DemoConfig
 from fxnext.execution.engine import DemoEngine, trading_day_start_ns
 from fxnext.execution.feed import dataset_from_bars, snapshot_for
@@ -45,12 +45,12 @@ class ReadOnlyBroker:
         return getattr(self.inner, name)
 
     def send(self, request: OrderRequest) -> SendResult:
-        return SendResult(SendStatus.REJECTED, retcode=0, comment="sola lettura: non inviato")
+        return SendResult(SendStatus.REJECTED, retcode=0, comment=DRY_RUN_COMMENT)
 
     def close_position(
         self, position: BrokerPosition, deviation_points: int, comment: str
     ) -> SendResult:
-        return SendResult(SendStatus.REJECTED, retcode=0, comment="sola lettura: non inviato")
+        return SendResult(SendStatus.REJECTED, retcode=0, comment=DRY_RUN_COMMENT)
 
 
 def status_text(store: ops.OpsStore, at_ns: int, engine: DemoEngine | None = None) -> str:

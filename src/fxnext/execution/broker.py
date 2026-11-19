@@ -21,6 +21,9 @@ from fxnext.ops.models import (
     Tick,
 )
 
+# Answer of the read-only broker (dry run): the order never left the PC.
+DRY_RUN_COMMENT = "sola lettura: non inviato"
+
 
 class BrokerUnavailable(RuntimeError):
     """Terminal not connected, not logged in, or the call failed without an answer."""
@@ -54,4 +57,4 @@ class Broker(Protocol):
         ...
 
 
-__all__ = ["Broker", "BrokerUnavailable"]
+__all__ = ["DRY_RUN_COMMENT", "Broker", "BrokerUnavailable"]

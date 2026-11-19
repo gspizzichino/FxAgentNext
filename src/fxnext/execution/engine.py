@@ -30,7 +30,7 @@ from fxnext.domain.calendar import FxCalendar, ny_1700_utc
 from fxnext.domain.contracts import EMPTY_STATE, Abstention, Candidate
 from fxnext.domain.enums import Direction, ReasonCode, Timeframe
 from fxnext.domain.timeutil import from_ns, to_ns
-from fxnext.execution.broker import Broker, BrokerUnavailable
+from fxnext.execution.broker import DRY_RUN_COMMENT, Broker, BrokerUnavailable
 from fxnext.execution.config import DemoConfig
 from fxnext.execution.feed import dataset_from_bars, snapshot_for
 from fxnext.execution.safety import (
@@ -835,6 +835,14 @@ class DemoEngine:
                 f"Aperta {symbol} {cand.direction.value} "
                 f"{result.volume} lotti a {result.price} (SL {cand.stop:.5f}, "
                 f"TP {cand.target:.5f}).",
+            )
+        elif state is IntentState.REJECTED and result.comment == DRY_RUN_COMMENT:
+            self._alert(
+                now_ns,
+                "INFO",
+                f"Sola lettura: il motore avrebbe aperto {symbol} {cand.direction.value} "
+                f"{self.config.volume} lotti a circa {cand.entry_ref} (SL {cand.stop:.5f}, "
+                f"TP {cand.target:.5f}). Nessun ordine inviato al broker.",
             )
         elif state is IntentState.REJECTED:
             self._alert(
