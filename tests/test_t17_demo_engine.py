@@ -748,6 +748,29 @@ def test_dashboard_shows_open_positions_live(tmp_path: Path) -> None:
     assert "Prezzo ora" in client.get("/oggi").text
 
 
+def test_equity_samples_and_page(tmp_path: Path) -> None:
+    from fastapi.testclient import TestClient
+
+    from fxnext.dashboard.app import create_app
+    from fxnext.dashboard.readers import Sources, equity_view
+    from fxnext.execution.engine import EQUITY_SAMPLE_S
+
+    broker, store, engine = make(tmp_path)
+    for k in range(4):  # 0 s, 60 s, 120 s, 300 s: two samples, five minutes apart
+        engine.step(to_ns(NOW) + (k * 60 if k < 3 else EQUITY_SAMPLE_S) * _S)
+    _fake_losses(store, 2, to_ns(NOW))
+    view = equity_view(engine.config.ops_db)
+    assert view is not None
+    assert len(view["equity"]) == 2 and view["currency"]
+    assert view["trade_count"] == 2 and view["total_r"] == pytest.approx(-2.0)
+    assert view["money"][-1][1] == pytest.approx(-2.0)
+
+    client = TestClient(create_app(Sources(research=tmp_path / "r", ops=engine.config.ops_db)))
+    page = client.get("/equity")
+    assert page.status_code == 200
+    assert page.text.count("<svg") == 3 and "Patrimonio e saldo" in page.text
+
+
 def test_dashboard_without_engine_db(tmp_path: Path) -> None:
     from fastapi.testclient import TestClient
 

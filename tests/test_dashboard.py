@@ -162,6 +162,7 @@ PAGES = [
     "/sistema",
     "/oggi",
     "/posizioni",
+    "/equity",
     "/segnali",
     "/proposte",
     "/news",

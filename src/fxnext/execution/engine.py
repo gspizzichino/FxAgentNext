@@ -63,6 +63,9 @@ _DATA_REASONS = frozenset(
 CrashHook = Callable[[str], None]
 
 
+EQUITY_SAMPLE_S = 300  # account balance and equity kept every 5 minutes (observations)
+
+
 def client_order_id(candidate_id: str) -> str:
     """Short id for the MT5 comment (<= 31 chars), unique per candidate."""
 
@@ -130,6 +133,7 @@ class DemoEngine:
         self.req = self.strategy.requirements(self.strategy_config)[0]
         self.crash_hook = crash_hook
         self.account: AccountIdentity | None = None
+        self._equity_sampled_ns: int | None = None
         self._startup_done = False
         self._missing_close: dict[int, int] = {}
 
@@ -594,6 +598,22 @@ class DemoEngine:
                 "currency": None if acct is None else acct.currency,
             },
         )
+        self._sample_equity(now_ns, acct)
+
+    def _sample_equity(self, now_ns: int, acct: AccountIdentity | None) -> None:
+        """One account sample every EQUITY_SAMPLE_S, for the dashboard's equity chart."""
+
+        if acct is None:
+            return
+        last = self._equity_sampled_ns
+        if last is not None and now_ns - last < EQUITY_SAMPLE_S * 1_000_000_000:
+            return
+        self.store.observe(
+            now_ns,
+            "equity",
+            {"balance": acct.balance, "equity": acct.equity, "currency": acct.currency},
+        )
+        self._equity_sampled_ns = now_ns
 
     # ================================================================== limits
     def _limits(self, now_ns: int, rep: StepReport) -> None:

@@ -581,3 +581,62 @@ def demo_view(db: Path, now: datetime) -> dict[str, Any] | None:
         "alerts": alerts,
         "commands": commands,
     }
+
+
+def equity_view(db: Path) -> dict[str, Any] | None:
+    """Account samples and the running result of the engine's closed trades (read only)."""
+
+    if not db.exists():
+        return None
+    from fxnext.ops.store import connect
+
+    conn = connect(db, readonly=True)
+    try:
+        samples = [
+            (int(r["at_ns"]), json.loads(r["detail"]))
+            for r in conn.execute(
+                "SELECT at_ns, detail FROM observations WHERE kind = 'equity' ORDER BY at_ns"
+            )
+        ]
+        trades = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT exit_ns, profit, swap, commission, r_net FROM trades ORDER BY exit_ns"
+            )
+        ]
+    finally:
+        conn.close()
+    balance = [(ns, float(d["balance"])) for ns, d in samples if d.get("balance") is not None]
+    equity = [(ns, float(d["equity"])) for ns, d in samples if d.get("equity") is not None]
+    currency = next((str(d.get("currency")) for _, d in reversed(samples) if d.get("currency")), "")
+    money: list[tuple[int, float]] = []
+    r_curve: list[tuple[int, float]] = []
+    total_money = total_r = 0.0
+    if trades:
+        start = int(trades[0]["exit_ns"]) - 1
+        money.append((start, 0.0))
+        r_curve.append((start, 0.0))
+    for t in trades:
+        total_money += float(t["profit"]) + float(t["swap"]) + float(t["commission"])
+        total_r += float(t["r_net"])
+        money.append((int(t["exit_ns"]), total_money))
+        r_curve.append((int(t["exit_ns"]), total_r))
+    peak, max_dd = None, 0.0
+    for _, v in equity:
+        peak = v if peak is None else max(peak, v)
+        max_dd = max(max_dd, peak - v)
+    return {
+        "balance": balance,
+        "equity": equity,
+        "currency": currency,
+        "first_at": _iso(equity[0][0]) if equity else "–",
+        "now_equity": equity[-1][1] if equity else None,
+        "now_balance": balance[-1][1] if balance else None,
+        "change": (equity[-1][1] - equity[0][1]) if equity else None,
+        "max_dd": max_dd if equity else None,
+        "money": money,
+        "r_curve": r_curve,
+        "trade_count": len(trades),
+        "total_money": total_money,
+        "total_r": total_r,
+    }

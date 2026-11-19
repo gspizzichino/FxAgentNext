@@ -46,6 +46,7 @@ NAV = [
         [
             ("oggi", "Oggi (demo)", ""),
             ("posizioni", "Posizioni e trade", ""),
+            ("equity", "Equity", ""),
             ("segnali", "Segnali e decisioni", ""),
             ("proposte", "Proposte AI", "M4"),
             ("news", "News e sentiment", ""),
@@ -316,6 +317,41 @@ def create_app(sources: rd.Sources, *, today: date | None = None) -> FastAPI:
     @app.get("/posizioni", response_class=HTMLResponse)
     def posizioni(request: Request) -> HTMLResponse:
         return demo(request, "posizioni.html", "posizioni", LIVE_REFRESH_SECONDS)
+
+    @app.get("/equity", response_class=HTMLResponse)
+    def equity(request: Request) -> HTMLResponse:
+        eq = rd.equity_view(sources.ops)
+        charts_ctx: dict[str, Any] = {}
+        if eq is not None:
+            charts_ctx = {
+                "equity_chart": charts.time_lines(
+                    [
+                        ("Saldo", "var(--muted)", eq["balance"], False),
+                        ("Patrimonio", "var(--accent)", eq["equity"], False),
+                    ],
+                    "Patrimonio e saldo del conto demo",
+                ),
+                "money_chart": charts.time_lines(
+                    [("Risultato", "var(--accent)", eq["money"], True)],
+                    "Risultato cumulato dei trade chiusi",
+                    zero=True,
+                ),
+                "r_chart": charts.time_lines(
+                    [("R", "var(--seal)", eq["r_curve"], True)],
+                    "R cumulati dei trade chiusi",
+                    unit=" R",
+                    zero=True,
+                ),
+            }
+        return render(
+            request,
+            "equity.html",
+            "equity",
+            eq=eq,
+            ops=sources.ops,
+            refresh=REFRESH_SECONDS,
+            **charts_ctx,
+        )
 
     @app.get("/segnali", response_class=HTMLResponse)
     def segnali(request: Request) -> HTMLResponse:
