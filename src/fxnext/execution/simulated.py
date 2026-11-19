@@ -7,7 +7,7 @@ SELL opens at the bid and its SL/TP trigger on the ask. The server clock is
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from fxnext.domain.enums import Direction
 from fxnext.execution.broker import BrokerUnavailable
@@ -157,7 +157,14 @@ class SimulatedBroker:
 
     def positions(self) -> list[BrokerPosition]:
         self._check()
-        return list(self.open_positions.values())
+        out = []
+        for pos in self.open_positions.values():
+            tick = self.ticks.get(pos.symbol)
+            if tick is not None:
+                price = tick.bid if pos.direction is Direction.LONG else tick.ask
+                pos = replace(pos, price_current=price)
+            out.append(pos)
+        return out
 
     def deals(self, from_server_s: int, to_server_s: int) -> list[BrokerDeal]:
         self._check()

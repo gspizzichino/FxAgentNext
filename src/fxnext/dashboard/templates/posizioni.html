@@ -4,6 +4,8 @@
 <div class="head"><span class="crumb">Ogni giorno</span><h1>Posizioni e trade sul demo</h1>
 <p class="muted">Esecuzione vera di Naga: prezzo ottenuto contro il prezzo quotato all'invio. <span id="refreshed"></span></p></div>
 {% if not demo %}<div class="panel"><p>Il motore demo non è ancora partito.</p></div>{% else %}
+{% include "_aperte.html" %}
+<h2>Trade chiusi</h2>
 <div class="panel"><dl class="kv"><dt>Trade chiusi</dt><dd>{{ demo.trade_count }}</dd><dt>Totale</dt><dd class="{{ demo.total_r|cls }}">{{ "%+.2f"|format(demo.total_r) }} R</dd>
 <dt>Slippage medio in entrata</dt><dd>{% if demo.mean_slippage is none %}–{% else %}{{ "%+.2f"|format(demo.mean_slippage) }} pip{% endif %}</dd></dl></div>
 <div class="panel"><div class="tw"><table><thead><tr><th>Coppia</th><th>Dir.</th><th>Entrata</th><th>Uscita</th><th>Motivo</th><th>Prezzo in</th><th>Prezzo out</th><th>Slippage in (pip)</th><th>Slippage out (pip)</th><th>Spread (pip)</th><th>Swap</th><th>Netto</th><th>R</th></tr></thead><tbody>

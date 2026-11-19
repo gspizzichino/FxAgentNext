@@ -79,6 +79,7 @@ class BrokerPosition:
     comment: str
     swap: float = 0.0
     profit: float = 0.0
+    price_current: float = 0.0  # last price the broker marks the position at
 
 
 @dataclass(frozen=True, slots=True)

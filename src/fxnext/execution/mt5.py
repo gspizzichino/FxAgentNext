@@ -167,6 +167,7 @@ class MT5Broker:
                 comment=str(p.comment),
                 swap=float(p.swap),
                 profit=float(p.profit),
+                price_current=float(getattr(p, "price_current", 0.0) or 0.0),
             )
             for p in rows
         ]
