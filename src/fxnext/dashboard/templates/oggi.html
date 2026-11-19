@@ -37,11 +37,7 @@
 {% if demo.commands %}<h3>Ultimi comandi</h3><ul>{% for c in demo.commands[:6] %}<li>{{ c.at }} {{ c.command }} da {{ c.source }}: {{ c.result or "in attesa" }}</li>{% endfor %}</ul>{% endif %}
 </div>
 </div>
-<div class="panel"><h2>Posizioni aperte</h2><div class="tw"><table><thead><tr><th>Coppia</th><th>Direzione</th><th>Lotti</th><th>Prezzo</th><th>Stop</th><th>Target</th><th>Aperta</th><th>Uscita a tempo</th></tr></thead><tbody>
-{% for p in demo.positions %}<tr><td>{{ p.symbol }}</td><td>{{ p.direction }}</td><td>{{ p.volume }}</td><td>{{ p.open_price }}</td><td>{{ p.sl }}</td><td>{{ p.tp }}</td><td>{{ p.open_at }}</td><td>{{ p.time_exit_at }}</td></tr>
-{% else %}<tr><td colspan="8" class="muted">Nessuna posizione aperta.</td></tr>{% endfor %}
-</tbody></table></div>
-{% if demo.foreign %}<p class="note">Posizioni di altri (non toccate): {% for f in demo.foreign %}{{ f[1] }} {{ f[2] }} {{ f[3] }} (magic {{ f[4] }}){% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}</div>
+{% include "_aperte.html" %}
 <div class="panel"><h2>Avvisi</h2><ul>{% for a in demo.alerts[:12] %}<li>{{ a.at }} <b>{{ a.level }}</b> {{ a.text }}</li>{% else %}<li class="muted">Nessun avviso.</li>{% endfor %}</ul></div>
 {% endif %}
 {% if ai %}

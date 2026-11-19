@@ -36,6 +36,7 @@ from fxnext.research.protocol import SPLITS
 
 HERE = Path(__file__).parent
 REFRESH_SECONDS = 30  # pages that follow something in progress (download, the engine)
+LIVE_REFRESH_SECONDS = 5  # open positions: about one engine loop
 # The only commands the app can queue. None of them opens or closes a trade.
 DEMO_COMMANDS = frozenset({CMD_KILL_ON, CMD_KILL_OFF, CMD_RESUME_WEEKLY, CMD_CLEAR_SUSPENSION})
 
@@ -293,9 +294,11 @@ def create_app(sources: rd.Sources, *, today: date | None = None) -> FastAPI:
     def sistema(request: Request) -> HTMLResponse:
         return render(request, "sistema.html", "sistema", telegram=TelegramConfig.from_env())
 
-    def demo(request: Request, name: str, page: str) -> HTMLResponse:
+    def demo(
+        request: Request, name: str, page: str, refresh: int = REFRESH_SECONDS
+    ) -> HTMLResponse:
         view = rd.demo_view(sources.ops, datetime.now(UTC))
-        return render(request, name, page, demo=view, refresh=REFRESH_SECONDS, ops=sources.ops)
+        return render(request, name, page, demo=view, refresh=refresh, ops=sources.ops)
 
     @app.get("/oggi", response_class=HTMLResponse)
     def oggi(request: Request) -> HTMLResponse:
@@ -312,7 +315,7 @@ def create_app(sources: rd.Sources, *, today: date | None = None) -> FastAPI:
 
     @app.get("/posizioni", response_class=HTMLResponse)
     def posizioni(request: Request) -> HTMLResponse:
-        return demo(request, "posizioni.html", "posizioni")
+        return demo(request, "posizioni.html", "posizioni", LIVE_REFRESH_SECONDS)
 
     @app.get("/segnali", response_class=HTMLResponse)
     def segnali(request: Request) -> HTMLResponse:

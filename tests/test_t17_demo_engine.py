@@ -714,6 +714,40 @@ def test_dashboard_demo_pages_and_command_queue(tmp_path: Path) -> None:
     assert row["source"] == "dashboard"
 
 
+def test_dashboard_shows_open_positions_live(tmp_path: Path) -> None:
+    from datetime import timedelta
+
+    from fastapi.testclient import TestClient
+
+    from fxnext.dashboard.app import create_app
+    from fxnext.dashboard.readers import Sources, demo_view
+
+    broker, store, engine = make(tmp_path)
+    engine.step(to_ns(NOW))
+    (row,) = store.open_positions()
+    risk = float(row["risk_price"])
+    bid = float(row["open_price"]) + risk / 2  # half way to the target side
+    broker.set_tick("EURUSD^", to_ns(NOW) + 3 * _S, bid, bid + 0.00008)
+    engine.step(to_ns(NOW) + 5 * _S)
+
+    view = demo_view(engine.config.ops_db, NOW + timedelta(seconds=6))
+    assert view is not None and view["live"]["fresh"]
+    (pos,) = view["positions"]
+    assert pos["price_now"] == pytest.approx(bid)  # a long is marked at the bid
+    assert pos["r_open"] == pytest.approx(0.5)
+    assert pos["pips_open"] == pytest.approx(risk / 2 / 1e-4)
+    assert view["open_r"] == pytest.approx(0.5)
+    assert view["live"]["currency"]
+
+    stale = demo_view(engine.config.ops_db, NOW + timedelta(minutes=5))
+    assert stale is not None and not stale["live"]["fresh"]
+
+    client = TestClient(create_app(Sources(research=tmp_path / "r", ops=engine.config.ops_db)))
+    page = client.get("/posizioni").text
+    assert "Prezzo ora" in page and 'data-refresh="5"' in page
+    assert "Prezzo ora" in client.get("/oggi").text
+
+
 def test_dashboard_without_engine_db(tmp_path: Path) -> None:
     from fastapi.testclient import TestClient
 

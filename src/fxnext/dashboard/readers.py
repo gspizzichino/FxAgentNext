@@ -19,6 +19,7 @@ from zoneinfo import ZoneInfo
 
 import duckdb
 
+from fxnext.research.execution import PIP_SIZE
 from fxnext.research.protocol import SPLITS
 
 SPLIT_LABELS = {"development": "sviluppo", "validation": "validazione", "holdout": "holdout"}
@@ -444,6 +445,50 @@ def _iso(ns: int | None) -> str:
     return datetime.fromtimestamp(int(ns) / 1e9, tz=UTC).astimezone(_ROME).strftime("%d/%m %H:%M")
 
 
+LIVE_STALE_S = 60  # older than this, the live prices are shown as not current
+
+
+def _live(beat: Any, now_ns: int) -> dict[str, Any]:
+    """The engine's last snapshot of its positions (heartbeat "protection")."""
+
+    if beat is None:
+        return {"positions": [], "at": "–", "age_s": None, "fresh": False}
+    try:
+        detail = json.loads(beat["detail"] or "{}")
+    except ValueError:
+        detail = {}
+    age = (now_ns - int(beat["at_ns"])) / 1e9
+    return {
+        "positions": [x for x in detail.get("live") or [] if isinstance(x, dict)],
+        "balance": detail.get("balance"),
+        "equity": detail.get("equity"),
+        "currency": detail.get("currency") or "",
+        "at": datetime.fromtimestamp(int(beat["at_ns"]) / 1e9, tz=UTC)
+        .astimezone(_ROME)
+        .strftime("%H:%M:%S"),
+        "age_s": age,
+        "fresh": age < LIVE_STALE_S,
+    }
+
+
+def _mark(row: dict[str, Any], snap: dict[str, Any] | None) -> None:
+    """Current price, result in account currency and open R of one position."""
+
+    row["price_now"] = row["result"] = row["r_open"] = row["pips_open"] = None
+    if snap is None:
+        return
+    price = float(snap.get("price") or 0.0)
+    row["result"] = float(snap.get("profit") or 0.0) + float(snap.get("swap") or 0.0)
+    if price <= 0:
+        return
+    sign = 1.0 if row["direction"] == "LONG" else -1.0
+    move = sign * (price - float(row["open_price"]))
+    row["price_now"] = price
+    row["pips_open"] = move / PIP_SIZE.get(row["symbol"], 1e-4)
+    risk = float(row["risk_price"] or 0.0)
+    row["r_open"] = move / risk if risk > 0 else None
+
+
 def demo_view(db: Path, now: datetime) -> dict[str, Any] | None:
     """Everything the demo pages show, read from the engine's SQLite in read-only mode."""
 
@@ -457,7 +502,9 @@ def demo_view(db: Path, now: datetime) -> dict[str, Any] | None:
         q = conn.execute
         meta = {r["key"]: r["value"] for r in q("SELECT key, value FROM meta")}
         controls = {r["key"]: dict(r) for r in q("SELECT * FROM controls")}
-        beats = {r["name"]: int(r["at_ns"]) for r in q("SELECT name, at_ns FROM heartbeats")}
+        beat_rows = list(q("SELECT name, at_ns, detail FROM heartbeats"))
+        beats = {r["name"]: int(r["at_ns"]) for r in beat_rows}
+        protection = next((r for r in beat_rows if r["name"] == "protection"), None)
         positions = [dict(r) for r in q("SELECT * FROM positions WHERE status = 'OPEN'")]
         trades = [dict(r) for r in q("SELECT * FROM trades ORDER BY exit_ns DESC LIMIT 200")]
         evaluations = [
@@ -486,9 +533,12 @@ def demo_view(db: Path, now: datetime) -> dict[str, Any] | None:
             blockers.append((label, c["reason"]))
     beat = beats.get("engine")
     age = None if beat is None else (now_ns - beat) / 1e9
+    live = _live(protection, now_ns)
+    by_ticket = {int(x.get("ticket", 0)): x for x in live["positions"]}
     for row in positions:
         row["open_at"] = _iso(row["open_ns"])
         row["time_exit_at"] = _iso(row["time_exit_ns"])
+        _mark(row, by_ticket.get(int(row["ticket"])))
     for row in trades:
         row["entry_at"] = _iso(row["entry_ns"])
         row["exit_at"] = _iso(row["exit_ns"])
@@ -518,6 +568,9 @@ def demo_view(db: Path, now: datetime) -> dict[str, Any] | None:
         "r_today": float(meta.get("r_today", 0) or 0),
         "r_week": float(meta.get("r_week", 0) or 0),
         "positions": positions,
+        "live": live,
+        "open_result": sum(p["result"] for p in positions if p["result"] is not None),
+        "open_r": sum(p["r_open"] for p in positions if p["r_open"] is not None),
         "foreign": json.loads(meta.get("foreign_positions", "[]") or "[]"),
         "trades": trades,
         "trade_count": len(trades),

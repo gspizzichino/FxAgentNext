@@ -1,0 +1,15 @@
+{# Open positions with the engine's latest broker prices. Needs `demo`. #}
+{% set lv = demo.live %}
+<div class="panel"><div class="ph"><h2>Posizioni aperte</h2>
+{% if demo.positions %}{% if lv.fresh %}<span class="pill p-ok">prezzi delle {{ lv.at }}</span>{% else %}<span class="pill p-wait">prezzi fermi alle {{ lv.at }}</span>{% endif %}{% endif %}</div>
+<div class="tw"><table><thead><tr><th>Coppia</th><th>Dir.</th><th>R</th><th>Risultato</th><th>Pip</th><th>Prezzo ora</th><th>Prezzo in</th><th>Lotti</th><th>Stop</th><th>Target</th><th>Aperta</th><th>Uscita a tempo</th></tr></thead><tbody>
+{% for p in demo.positions %}{% set d = 3 if p.symbol.endswith("JPY") else 5 %}<tr><td>{{ p.symbol }}</td><td>{{ p.direction }}</td>
+<td class="{{ p.r_open|cls }}">{% if p.r_open is none %}–{% else %}{{ "%+.2f"|format(p.r_open) }}{% endif %}</td>
+<td class="{{ p.result|cls }}">{% if p.result is none %}–{% else %}{{ "%+.2f"|format(p.result) }} {{ lv.currency }}{% endif %}</td>
+<td class="{{ p.pips_open|cls }}">{% if p.pips_open is none %}–{% else %}{{ "%+.1f"|format(p.pips_open) }}{% endif %}</td>
+<td>{{ p.price_now|num(d) }}</td><td>{{ p.open_price|num(d) }}</td><td>{{ p.volume }}</td>
+<td>{{ p.sl|num(d) }}</td><td>{{ p.tp|num(d) }}</td><td>{{ p.open_at }}</td><td>{{ p.time_exit_at }}</td></tr>
+{% else %}<tr><td colspan="12" class="muted">Nessuna posizione aperta.</td></tr>{% endfor %}
+</tbody></table></div>
+{% if demo.positions %}<p class="note">In totale {{ "%+.2f"|format(demo.open_r) }} R, {{ "%+.2f"|format(demo.open_result) }} {{ lv.currency }} (con swap, senza commissione di uscita). R e pip sono calcolati sul prezzo a cui il broker valuta la posizione: per un long il bid, per uno short l'ask.{% if lv.equity is not none %} Patrimonio del conto {{ lv.equity|num }} {{ lv.currency }}, saldo {{ lv.balance|num }}.{% endif %}</p>{% endif %}
+{% if demo.foreign %}<p class="note">Posizioni di altri (non toccate): {% for f in demo.foreign %}{{ f[1] }} {{ f[2] }} {{ f[3] }} (magic {{ f[4] }}){% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}</div>

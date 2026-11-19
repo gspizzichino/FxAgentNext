@@ -572,7 +572,28 @@ class DemoEngine:
                         f"Uscita a tempo di {ticket} non riuscita "
                         f"({res.retcode} {res.comment}); riprovo al prossimo giro.",
                     )
-        self.store.beat("protection", now_ns, {"positions": len(broker_pos)})
+        # Snapshot for the dashboard (read only): price and result of each of our positions.
+        live = [
+            {
+                "ticket": p.ticket,
+                "price": p.price_current,
+                "profit": p.profit,
+                "swap": p.swap,
+            }
+            for p in broker_pos.values()
+        ]
+        acct = self.account
+        self.store.beat(
+            "protection",
+            now_ns,
+            {
+                "positions": len(broker_pos),
+                "live": live,
+                "balance": None if acct is None else acct.balance,
+                "equity": None if acct is None else acct.equity,
+                "currency": None if acct is None else acct.currency,
+            },
+        )
 
     # ================================================================== limits
     def _limits(self, now_ns: int, rep: StepReport) -> None:
