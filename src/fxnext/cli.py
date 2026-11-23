@@ -127,6 +127,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--research", type=Path, default=Path("research"))
     p.add_argument("--code-version", default=None)
 
+    p = sub.add_parser("gotobi", help="E1 gotobi USDJPY: data check, then one confirmation run")
+    p.add_argument("prereg", type=Path)
+    p.add_argument("--paths", type=Path, default=Path("data/paths"))
+    p.add_argument("--research", type=Path, default=Path("research"))
+    p.add_argument("--check", action="store_true", help="coverage and spreads only, no returns")
+
     p = sub.add_parser("g10-download", help="daily BID+ASK candles of the 9 USD pairs (G10)")
     p.add_argument("--cache", type=Path, default=Path("data/raw-d1"))
     p.add_argument("--from-year", type=int, default=2003)
@@ -326,6 +332,12 @@ def main(argv: list[str] | None = None) -> int:
 
         agg = write_summary(args.results, args.out)
         print(json.dumps({"out": str(args.out), "pooled": agg["pooled"]["exec_x1"]}, indent=2))
+        return 0
+    if args.cmd == "gotobi":
+        from fxnext.research.gotobi.run import run as run_gotobi
+
+        rep = run_gotobi(args.prereg, args.paths, args.research, check_only=args.check)
+        print(json.dumps({k: rep[k] for k in ("data_check", "assessment") if k in rep}, indent=2))
         return 0
     if args.cmd == "hypothesis":
         from fxnext.research.hyp.runner import run_hypothesis
