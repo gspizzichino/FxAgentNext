@@ -1,0 +1,7 @@
+# Generated from the frozen text m8/prereg-e1-gotobi-001-congelato-2026-11-23 (sha256 below)
+# without changing its rules. The rules live in src/fxnext/research/gotobi/; this file only
+# names the data. `paths` gets the ids of the two USDJPY M1 paths (2008-01-01 -> 2015-01-01 and
+# 2024-01-01 -> 2026-11-01) after `fxnext import`, before `fxnext gotobi --check`.
+experiment_id = "e1-gotobi-001"
+frozen_text_sha256 = "64bf779ae50311255c628f62317bd80b2bb91d2e15fa29e48ea45e2349ca6744"
+paths = []
