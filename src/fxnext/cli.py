@@ -155,6 +155,20 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--research", type=Path, default=Path("research"))
     p.add_argument("--code-version", default=None)
 
+    p = sub.add_parser("l1-download", help="M10: FRED and Bundesbank series to 2003 (l1 filter)")
+    p.add_argument("--out", type=Path, default=Path("data/l1"))
+    p.add_argument("--min-interval", type=float, default=2.0)
+
+    p = sub.add_parser("l1-check", help="M10: data check of l1-composito (coverage only)")
+    p.add_argument("prereg", type=Path)
+    p.add_argument("--data", type=Path, default=Path("data/l1"))
+
+    p = sub.add_parser("l1-run", help="M10: the single run of l1-composito")
+    p.add_argument("prereg", type=Path)
+    p.add_argument("--data", type=Path, default=Path("data/l1"))
+    p.add_argument("--research", type=Path, default=Path("research"))
+    p.add_argument("--code-version", default=None)
+
     p = sub.add_parser("broker-costs", help="print a measured broker cost profile")
     p.add_argument("--profile", default="naga-demo-2026-11-18")
     p.add_argument(
@@ -402,6 +416,42 @@ def main(argv: list[str] | None = None) -> int:
                     "fingerprint": g10.fingerprint,
                     "path": str(g10.path),
                     "outcome": g10.report["assessment"]["outcome"],
+                },
+                indent=2,
+            )
+        )
+        return 0
+    if args.cmd == "l1-download":
+        from fxnext.research.composite.sources import download_sources
+
+        statuses = download_sources(
+            args.out,
+            min_interval=args.min_interval,
+            progress=lambda r: print(f"{r['series']}: {r['status']}", file=sys.stderr, flush=True),
+        )
+        print(json.dumps(statuses, indent=2))
+        bad = [k for k, v in statuses.items() if v in ("FAILED", "CORRUPT")]
+        return 0 if not bad else 1
+    if args.cmd in ("l1-check", "l1-run"):
+        from fxnext.research.composite.runner import run_l1
+
+        l1 = run_l1(
+            args.prereg,
+            data_root=args.data,
+            research_root=getattr(args, "research", Path("research")),
+            code_version=getattr(args, "code_version", None) or code_version(),
+            check_only=args.cmd == "l1-check",
+            progress=lambda m: print(m, file=sys.stderr, flush=True),
+        )
+        if args.cmd == "l1-check":
+            print(json.dumps(l1.report, indent=2, default=str))
+            return 0
+        print(
+            json.dumps(
+                {
+                    "fingerprint": l1.fingerprint,
+                    "path": str(l1.path),
+                    "outcome": l1.report["assessment"]["outcome"],
                 },
                 indent=2,
             )
