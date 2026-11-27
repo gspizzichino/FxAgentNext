@@ -53,3 +53,8 @@ riprende dopo un blocco per frequenza di FRED.
 13. **Metà del periodo**: i mesi di tenuta divisi in due parti uguali (la seconda ha un mese in più se
     il numero è dispari).
 14. **t di Newey-West** con 6 ritardi, pesi di Bartlett, sulla serie mensile netta.
+15. **Certificati (27/11/2026).** Sul PC di Giacomo il primo download della Bundesbank è fallito
+    con `CERTIFICATE_VERIFY_FAILED` (Python non completa la catena che il browser accetta).
+    `l1-download` verifica ora TLS con il certificate store del sistema operativo (`truststore`).
+    La verifica resta attiva. Le serie già scaricate (OK o NOT_FOUND) sono saltate, le FAILED
+    vengono ritentate.

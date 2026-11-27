@@ -12,15 +12,20 @@ from __future__ import annotations
 import csv
 import hashlib
 import io
+import ssl
 import time
+import urllib.error
+import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
-from fxnext.data.daily import RatesCache, _fetch, fred_fetcher
-from fxnext.data.dukascopy import Fetcher, FetchStatus
+import truststore
+
+from fxnext.data.daily import RatesCache, _fetch
+from fxnext.data.dukascopy import Fetcher, FetchStatus, HttpResult, TransientHttpError
 
 L1_DOWNLOADER_VERSION = "l1-sources-downloader-v1"
 FIRST_DAY = date(1970, 1, 1)
@@ -124,6 +129,26 @@ class SourceError(ValueError):
     pass
 
 
+def os_trust_fetcher(url: str, timeout: float) -> HttpResult:
+    """Plain urllib request verified by the operating system's certificate store.
+
+    On Windows the Bundesbank server is accepted by the browser but not by Python's
+    own bundle ("unable to get local issuer certificate", 27/11/2026): the OS
+    verifier completes the chain the way the browser does. TLS stays verified.
+    """
+
+    context = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    try:
+        with urllib.request.urlopen(url, timeout=timeout, context=context) as response:  # noqa: S310
+            return HttpResult(int(response.status), response.read())
+    except urllib.error.HTTPError as error:
+        if error.code >= 500 or error.code == 429:
+            raise TransientHttpError(f"HTTP {error.code}") from error
+        return HttpResult(int(error.code), b"")
+    except (urllib.error.URLError, TimeoutError, ConnectionError) as error:
+        raise TransientHttpError(str(error)) from error
+
+
 @dataclass(frozen=True)
 class Series:
     sid: str
@@ -202,7 +227,7 @@ def parse_bundesbank(payload: bytes, sid: str) -> Series:
 def download_sources(
     root: Path,
     *,
-    fetcher: Fetcher = fred_fetcher,
+    fetcher: Fetcher = os_trust_fetcher,
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
     max_attempts: int = 4,
     backoff_seconds: float = 5.0,
@@ -230,7 +255,7 @@ def download_sources(
     for sid, url in jobs:
         if sid in resolved:
             out[sid] = "SKIPPED"
-            continue
+            continue  # OK and NOT_FOUND are final; FAILED and CORRUPT are retried
         if not first and min_interval > 0:
             sleep(min_interval)
         first = False
