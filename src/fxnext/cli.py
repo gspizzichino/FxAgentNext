@@ -127,6 +127,18 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--research", type=Path, default=Path("research"))
     p.add_argument("--code-version", default=None)
 
+    for name, text in (
+        ("h1-check", "H1 cb drift: data check only (no returns)"),
+        ("h1-run", "H1 cb drift: run the pre-registration h1-cbdrift-001 (M11)"),
+    ):
+        p = sub.add_parser(name, help=text)
+        p.add_argument("prereg", type=Path)
+        p.add_argument("--cache", type=Path, default=Path("data/raw-d1"))
+        p.add_argument("--rates", type=Path, default=Path("data/h1-rates/raw"))
+        p.add_argument("--calendar", type=Path, default=Path("data/h1-rates/calendar/meetings.csv"))
+        p.add_argument("--research", type=Path, default=Path("research"))
+        p.add_argument("--code-version", default=None)
+
     p = sub.add_parser("gotobi", help="E1 gotobi USDJPY: data check, then one confirmation run")
     p.add_argument("prereg", type=Path)
     p.add_argument("--paths", type=Path, default=Path("data/paths"))
@@ -346,6 +358,33 @@ def main(argv: list[str] | None = None) -> int:
 
         agg = write_summary(args.results, args.out)
         print(json.dumps({"out": str(args.out), "pooled": agg["pooled"]["exec_x1"]}, indent=2))
+        return 0
+    if args.cmd in ("h1-check", "h1-run"):
+        from fxnext.research.cbdrift.runner import run_cbdrift
+
+        h1 = run_cbdrift(
+            args.prereg,
+            cache_root=args.cache,
+            rates_root=args.rates,
+            calendar_path=args.calendar,
+            research_root=args.research,
+            code_version=args.code_version or code_version(),
+            progress=lambda m: print(m, file=sys.stderr, flush=True),
+            check_only=args.cmd == "h1-check",
+        )
+        if args.cmd == "h1-check":
+            print(json.dumps(h1.report, indent=2))
+            return 0
+        print(
+            json.dumps(
+                {
+                    "fingerprint": h1.fingerprint,
+                    "path": str(h1.path),
+                    "outcome": h1.report["assessment"]["outcome"],
+                },
+                indent=2,
+            )
+        )
         return 0
     if args.cmd == "gotobi":
         from fxnext.research.gotobi.run import run as run_gotobi
