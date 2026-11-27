@@ -1,0 +1,14 @@
+# Generated from the frozen text m6/prereg-h1-cbdrift-001-congelato-2026-11-27.md (sha256 below)
+# without changing its rules. The rules live in src/fxnext/research/cbdrift/; this file only
+# chooses the split. Validation (2014-2026, once) needs a new file with split = "validation"
+# and Giacomo's approval written verbatim in validation_approval.
+experiment_id = "h1-cbdrift-001"
+hypothesis = "Deriva delle valute G10 nei 10 giorni prima delle decisioni delle banche centrali, nella direzione attesa dal tasso a 1 mese"
+kind = "cb_drift"
+frozen_text = "prereg-h1-cbdrift-001-congelato-2026-11-27.md"
+frozen_text_sha256 = "b1bb6179f60e15645235e17e02a3344d5e924d7440ae9625a04667afd47eb494"
+split = "development"
+benchmark_repetitions = 1000
+benchmark_seed = 20261124
+bootstrap_samples = 10000
+bootstrap_seed = 20261123
