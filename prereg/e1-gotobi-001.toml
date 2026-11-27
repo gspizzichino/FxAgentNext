@@ -4,4 +4,4 @@
 # 2024-01-01 -> 2026-11-01) after `fxnext import`, before `fxnext gotobi --check`.
 experiment_id = "e1-gotobi-001"
 frozen_text_sha256 = "64bf779ae50311255c628f62317bd80b2bb91d2e15fa29e48ea45e2349ca6744"
-paths = []
+paths = ["df889f5e51fe66553958fcbd17a40c06f59532c5e2e1ac613313cb77b7292288", "cfce7b50d7403a719afbfc593064ecba98a89245ce6f22e5d02cef6c6992f3a1"]
