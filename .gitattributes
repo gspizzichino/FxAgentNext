@@ -2,3 +2,5 @@
 prereg/*.toml text eol=lf
 # Broker cost profiles are checked by sha256 on load.
 src/fxnext/research/broker/*.json text eol=lf
+# Frozen pre-registration texts are hashed byte for byte too.
+docs/*-congelato.md text eol=lf

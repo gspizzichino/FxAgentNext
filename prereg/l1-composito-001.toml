@@ -1,0 +1,18 @@
+# Generated from the frozen text prereg-l1-composito-001-congelato-2026-11-26.md
+# (frozen with Giacomo's ok on 2026-11-26 21:05 UTC; copy in docs/). Do not edit: a rule
+# change is a new pre-registration with a new ID.
+experiment_id = "l1-composito-001"
+hypothesis = "Composito momentum economico + value, filtro storico 1976-2003 con costi Naga"
+kind = "l1_composite_filter"
+frozen_text = "prereg-l1-composito-001-congelato-2026-11-26.md"
+frozen_text_sha256 = "027e332234cd410e2fb090b170c465d48f48aa483f14f926e919ffcc56810f3c"
+broker_profile = "naga-demo-2026-11-18"
+rate_lag_months = 1
+min_currencies = 7
+latest_start = [1985, 12]
+t_threshold = 2.0
+newey_west_lags = 6
+stress_multiplier = 1.5
+benchmark_repetitions = 1000
+benchmark_percentile = 95.0
+benchmark_seed = 20261126
